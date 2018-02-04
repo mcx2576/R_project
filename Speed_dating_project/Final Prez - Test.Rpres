@@ -1,0 +1,461 @@
+TO 414 Final Project
+========================================================
+author: Group 8: Matthew Davis, Alec Drean, Changxin Miao, Sonia Shekar, and Mara Van Sickle
+date: Fall 2016
+font-family: 'Risque'
+incremental: true
+width: 1920
+height: 1080
+
+Agenda
+========================================================
+type: sub-section
+
+Introduction
+
+Methodology
+
+Initial Visualization
+
+Understanding Matches
+
+Modeling and Analysis
+
+Conclusion
+
+```{r, echo = FALSE}
+#Download the libraries that will be necessary to our analysis. 
+suppressPackageStartupMessages(library("aod"))
+suppressPackageStartupMessages(library("dplyr"))
+suppressPackageStartupMessages(library("reshape2"))
+suppressPackageStartupMessages(library("ggplot2"))
+suppressPackageStartupMessages(library("stats"))
+suppressPackageStartupMessages(library("randomForest"))
+suppressPackageStartupMessages(library("caret"))
+suppressPackageStartupMessages(library("data.table"))
+```
+
+Introduction
+========================================================
+type: sub-section
+
+Objective
+- Primary: Create model to predict whether or not two individuals will match after a speed dating encounter
+- Secondary: Gain insight into speed dating data and variables that influence match success
+
+The Data: 
+- Response Variable
+   - Match or No Match
+- Predictor Variables
+    - Demographic Data
+    - Partner Attribute Rankings
+    - Preference/Response Rankings Over Time
+  
+Methodology
+========================================================
+type: sub-section
+Data Cleanup
+- Variable Class Changes
+- Merge Individual & Partner Information
+- Variable Standardization
+Demographic Visualization 
+
+Initial Match Visualization
+- Response (Match vs. No Match)
+ 
+Logistic Regression
+
+Machine Learning Algorithm
+- Random Forest
+  
+Data Cleaning
+========================================================
+type: sub-section
+We begin by downloading the data into a table that we will work with to run our analysis. This table, or data frame, is called "datedata". 
+
+Furthermore, in order for us to properly run analyses on our data, it is necessary that we change the format of some variables. 
+
+Some numeric values are changed to factors (discrete, unique values) and other variables are changed to numerical values.
+```{r,echo=FALSE}
+datedata <- read.csv("Speed Dating Data.csv", header = T)
+
+#Variables to Change Into Factors:
+datedata$field_cd <- as.factor(datedata$field_cd)
+datedata$race <- as.factor(datedata$race)
+datedata$gender <- as.factor(datedata$gender)
+datedata$goal <- as.factor(datedata$goal)
+datedata$date <- as.factor(datedata$date)
+datedata$go_out <- as.factor(datedata$go_out)
+datedata$career_c <- as.factor(datedata$career_c)
+datedata$length <- as.factor(datedata$length)
+datedata$numdat_2 <- as.factor(datedata$numdat_2)
+datedata$date_3 <- as.factor(datedata$date_3)
+
+#Variables to Change Into Numbers
+datedata$income <- as.numeric(datedata$income)
+datedata$mn_sat <- as.numeric(datedata$mn_sat)
+datedata$tuition <- as.numeric(datedata$tuition)
+```
+
+Initial Visualization
+========================================================
+type: sub-section
+Demographics
+
+Before diving into data analyzing match success, let's take a step back and understand the men and women who participated in these speed dating rounds. Who are these individuals? What can we learn about them that may be insightful for constructing our match making algorithms later on?
+
+Initial Visualization
+========================================================
+A simple place to begin is with gender. Do we have an even match between men and women?
+```{r,echo=FALSE,fig.width=8,fig.height=3.25,dpi=300,out.width="1920px",height="1080px"}
+Gender <- c("Female", "Male")
+
+gender_df <- datedata[!is.na(datedata$gender),] %>%
+  distinct(iid, .keep_all = TRUE) %>%
+  group_by(gender) %>%
+  summarise(amount = n())
+
+ggplot(gender_df, aes(x=gender, y=amount, fill=Gender)) + geom_bar(stat = "identity") + xlab(NULL) + ylab("Count") + ggtitle("Gender Distribution") + coord_flip() + scale_x_discrete(labels = Gender)
+```
+
+It appears that we are almost perfectly 50/50, with 277 males and 274 females participating. 
+
+Initial Visualization
+========================================================
+The next interaction to observe is between race and the preference of race. 
+```{r,echo= FALSE,fig.width=8,fig.height=3.0,dpi=300,out.width="1920px",height="1080px"}
+Race <- c("Black/African American", "European/Caucasian American", "Latino/Hispanic American", "Asian/Pacific Islander", "Other")
+
+#Note, we exclude Native Americans because there are none in our survey data
+
+race_df <- datedata[!is.na(datedata$race),] %>%
+  distinct(iid, .keep_all = TRUE) %>%
+  group_by(gender, race) %>%
+  summarise(amount = n())
+
+ggplot(race_df, aes(x = race, y = amount, fill = gender)) + geom_bar(stat = "identity", position = "dodge") + xlab(NULL) + ylab("Count") + ggtitle("Race Distribution by Gender") + coord_flip() + scale_x_discrete(labels = Race)
+```
+
+As we can see here, the population of individuals in not incredibly diverse. Native Americans were not included in the speed dating pool, so they did not appear in our analysis. As the graph shows, the population is over 50% white. The next largest population, Asian individuals, is as large as all of the other groups combined. 
+
+Initial Visualization
+================================================
+We want to see if individuals of different races place more or less weight on the race of their partner when speed dating. 
+
+```{r,echo= FALSE,fig.width=8,fig.height=3.25,dpi=300,out.width="1920px",height="1080px"}
+Race <- c("Black/African American", "European/Caucasian American", "Latino/Hispanic American", "Asian/Pacific Islander", "Other")
+
+imprace_df <- datedata[!is.na(datedata$imprace),] %>%
+  distinct(iid, .keep_all = TRUE) %>%
+  group_by(gender, race) %>%
+  summarise(avg = mean(imprace))
+
+ggplot(imprace_df, aes(x = race, y = avg, fill = gender)) + geom_bar(stat = "identity", position = "dodge") + xlab(NULL) + ylab("Count") + ggtitle("Importance of Partner's Race by Race & Gender") + coord_flip() + scale_x_discrete(labels = Race)
+
+```
+
+Initial Visualization
+=========================================
+Social/Relationship Habits
+```{r,echo=FALSE,fig.width=8,fig.height=3.25,dpi=300,out.width="1920px",height="1080px"}
+goal.coded <- c("Fun night out", "Meet new people", "Get date", "Serious relationship", "To say I did it", "Other")
+
+goal_df <- datedata[!is.na(datedata$goal),] %>%
+  distinct(iid, .keep_all = TRUE) %>%
+  group_by(gender, goal) %>%
+  summarise(amount = n())
+
+ggplot(goal_df, aes(x = goal, y = amount, fill = gender)) + geom_bar(stat = "identity", position = "dodge") + xlab(NULL) + ylab("Count") + ggtitle("Goal Distribution by Gender") + coord_flip() + scale_x_discrete( labels = goal.coded, breaks = 1:6)
+```
+
+As you can see from the above plot, most people's intentions in attending the speed dating event skew towards more casual objectives, like meeting new people and having a fun night, rather than begin a serious relationship.  What is worthy of noting is that twice as many males have a goal of getting a date than females.
+
+Initial Visualization
+===================================
+Frequency of Going Out
+```{r,echo=FALSE,fig.width=8,fig.height=3.0,dpi=300,out.width="1920px",height="1080px"}
+goout.coded <- c("Several times a week", "Twice a week", "Once a week", "Twice a month", "Once a month", "Several times a year", "Never")
+
+goout_df <- datedata[!is.na(datedata$go_out),] %>%
+  distinct(iid, .keep_all = TRUE) %>%
+  group_by(gender, go_out) %>%
+  summarise(amount = n())
+
+ggplot(goout_df, aes(x = go_out, y = amount, fill = gender)) + geom_bar(stat = "identity", position = "dodge") + xlab(NULL) + ylab("Count") + ggtitle("Going Out Habits by Gender") + coord_flip() + scale_x_discrete( labels = goout.coded, breaks = 1:7)
+```
+
+Contrary to the dating plot, this plot revelas that speed dating participants skew towards going out frequently, where the dating habit plot reveals that participants skew towards infrequent dating.
+
+While there are many other demographic variables, we believe those mentioned provide a base level of insight into the individuals who participate in speed dating. 
+
+Initial Visualization
+=============================================
+Dating Experiences
+```{r,echo=FALSE,fig.width=8,fig.height=3.25,dpi=300,out.width="1920px",height="1080px"}
+date.coded <- c("Several times a week", "Twice a week", "Once a week", "Twice a month", "Once a month", "Several times a year", "Never")
+
+date_df <- datedata[!is.na(datedata$date),] %>%
+  distinct(iid, .keep_all = TRUE) %>%
+  group_by(gender, date) %>%
+  summarise(amount = n())
+
+ggplot(date_df, aes(x = date, y = amount, fill = gender)) + geom_bar(stat = "identity", position = "dodge") + xlab(NULL) + ylab("Count") + ggtitle("Dating Habits by Gender") + coord_flip() + scale_x_discrete( labels = date.coded, breaks = 1:7)
+```
+
+The above plot reveals that the majority of speed dating participants are relatively inexperienced with the dating scene.  This is different than the following analysis of participants "going out" habits, which the survey indicated did not necessarily mean "going out on dates"
+
+Understanding Matches
+========================================================
+type: sub-section
+The next portion of our analysis will look at matches. We want to understand the number of matches that occurred and the factors that may or may not have contributed to the match. 
+
+In order to make our dataset easier to manage we needed to reduce the number of rows. Matches were double counted in the data, once from the man's perspective and once from the women's perspective. 
+
+To simplify the data we will work with for the remainder of our analysis, we created a new data frame that lists the first person's perspective and respective personal data, then their partner's perspective and respective personal data.
+
+```{r,echo=FALSE}
+#New Dataset Recording Individual's Preferences & Demographical Background
+date1<-datedata[,c(1,11:69,98:107)]
+
+#New Dataset Recording Individual's Partner's Demographical Background
+date2<-datedata[,c(1,11:12,25:69,98:107)]
+
+#Merging the Two Data Sets Together
+newdate<-merge(date1, date2, by.x=c('iid','pid'), by.y=c('pid','iid'))
+newdate<-newdate[newdate$iid > newdate$pid,]
+```
+
+Understanding Matches
+========================================================
+```{r,echo=FALSE}
+nomatch <- length(which(datedata$match == 0))
+nomatch<- round(nomatch/2, 0)
+
+newnomatch <- length(which(newdate$match == 0))
+ 
+match <- length(which(datedata$match == 1))
+match <- round(match/2, 0)
+```
+We found that there were **`r match`** matches and **`r nomatch`** no-matches.
+```{r,echo=FALSE,fig.width=8,fig.height=3.25,dpi=300,out.width="1920px",height="1080px"}
+#Data Frame of Matches
+Number.of.Matches <- c(nomatch, match)
+Number.of.Matches<-as.data.frame(Number.of.Matches)
+Number.of.Matches$status<-c("No Match","Match")
+
+ggplot(data=Number.of.Matches,aes(x=status,y=Number.of.Matches,fill=status)) + geom_bar(stat = "identity")
+```
+
+Here we see the breakdown of the match data. Clearly, there are many more non-matches than matches!
+
+Understanding Decisions
+========================================================
+type: sub-section
+Taking this information one step forward, we can compare decisions to matches. At the end of each night of speed dating, each person must make a yes/no decision for each partner they met with throughout the night. For example, say a woman was filling out her form at the end of the night. She would have to evaluate each male partner she met that night to make a decisions of yes, I would like to see this person again, or no, I do not want to see this person again. If she makes a yes decision for a man and that same man makes a yes for her, it's a match! However, many yes decisions often go unreciprocated. 
+
+As a result, we create a new variable that merges an individual's data with their partner's. If both parties make a decision for yes, the value is two. If only one party makes a yes decision, the value is one. Lastly, a value of zero means both parties decided no. The data breaks down as follows:
+
+Understanding Decisions
+===================================
+```{r,echo=FALSE,fig.width=8,fig.height=3.25,dpi=300,out.width="1920px",height="1080px"}
+newdate$dec.x <- as.numeric(newdate$dec.x)
+newdate$dec.y <- as.numeric(newdate$dec.y)
+newdate$combineddec = newdate$dec.x + newdate$dec.y
+newdate$combineddec <- as.factor(newdate$combineddec)
+
+ggplot(newdate, aes(x=combineddec, fill=combineddec)) + geom_bar(position = "dodge") + ggtitle("Understanding Decisions") + labs(x = "Number of Decisions per Individual Meeting", y = "Count")
+```
+
+As we can see, the majority of no-matches are actually single sided decisions, in other words one person made a decision to want to match, but the partner did not reciprocate that decision. 
+
+Understanding Decisions
+================================================
+Ratings for a Yes Decision
+
+Now that we know how the overall pool was rated, let's see if ratings vary significantly for people that received a yes decision. 
+
+```{r,echo=FALSE,fig.width=8,fig.height=3.25,dpi=300,out.width="1920px",height="1080px"}
+
+#table(datedata$dec, useNA = "ifany")
+##We don't have any NAs - good. 
+
+#segment into male ---
+datedata.yes <- filter(datedata, dec == 1)
+
+datedata.yes.survey <- datedata.yes[99:103]
+
+ggplot(melt(datedata.yes.survey), aes(variable, value,color=variable)) + geom_boxplot() + ggtitle("How were people that received a yes decision rated?") + labs(x="Trait", y="Rating") + scale_x_discrete(labels = c("Attractiveness", "Sincerity", "Intelligence", "Fun", "Ambition")) + scale_y_continuous(limits = c(0, 11), breaks = c(0,2,4,6,8,10))
+```
+
+It appears that Intelligence and Sincerity were rated highest for people that received a yes decision. 
+
+Understanding Decisions
+================================================
+Ratings for a No Decision
+
+Let's take one last look at the survey data to see what ratings were associated with a no decision. 
+```{r,echo=FALSE,fig.width=8,fig.height=3.25,dpi=300,out.width="1920px",height="1080px"}
+
+datedata.no <- filter(datedata, dec == 0)
+datedata.no.survey <- datedata.no[99:103]
+
+ggplot(melt(datedata.no.survey), aes(variable, value,color=variable)) + geom_boxplot() + ggtitle("How were people that received a no decision rated?") + labs(x="Trait", y="Rating") + scale_x_discrete(labels = c("Attractiveness", "Sincerity", "Intelligence", "Fun", "Ambition")) + scale_y_continuous(limits = c(0, 11), breaks = c(0,2,4,6,8,10))
+
+```
+
+
+Understanding Decisions
+================================================
+Order's Influence on Matches
+```{r,echo=FALSE,fig.width=8,fig.height=3.25,dpi=300,out.width="1920px",height="1080px"}
+order.coded <- c("First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Nineth", "Tenth", "Eleventh", "Twelfth", "Thirteenth", "Fourteenth", "Fifteenth", "Sixteenth", "Seventeenth", "Eighteenth", "Nineteenth", "Twentieth", "Twenty-first", "Twenty-second")
+
+matchdatedata <- filter(datedata, match == 1)
+
+order_df <- matchdatedata[!is.na(matchdatedata$order),] %>%
+  distinct(iid, .keep_all = TRUE) %>%
+  group_by(gender, order) %>%
+  summarise(amount = n())
+
+ggplot(order_df, aes(x=order, y=amount, fill=gender)) + geom_bar(stat = "identity", position = "dodge") + xlab(NULL) + ylab("Count") + ggtitle("Likelihood of Match by Date Order of Night") + coord_flip() + scale_x_discrete(labels = order.coded, breaks = 1:22)
+```
+
+Understanding Decisions
+=====================================================
+Survey Results over Time
+
+Here we look at how survey responses on importance of characteristics differ over time
+```{r,echo=FALSE,fig.width=8,fig.height=3.25,dpi=300,out.width="1920px",height="1080px"}
+attach(datedata)
+SurveyChange <- matrix(c(mean(attr1_s,na.rm=TRUE),mean(attr7_2,na.rm=TRUE),mean(attr7_3,na.rm=TRUE),mean(sinc1_s,na.rm=TRUE),mean(sinc7_2,na.rm=TRUE),mean(sinc7_3,na.rm=TRUE),mean(intel1_s,na.rm=TRUE),mean(intel7_2,na.rm=TRUE),mean(intel7_3,na.rm=TRUE),mean(fun1_s,na.rm=TRUE),mean(fun7_2,na.rm=TRUE),mean(fun7_3,na.rm=TRUE),mean(amb1_s,na.rm=TRUE),mean(amb7_2,na.rm=TRUE),mean(amb7_3,na.rm=TRUE),mean(shar1_s,na.rm=TRUE),mean(shar7_2,na.rm=TRUE),mean(shar7_3,na.rm=TRUE)),ncol=6,byrow=FALSE)
+colnames(SurveyChange) <- c("Attractiveness","Sincerity","Intelligence","Fun","Ambition","Shared Interests")
+SurveyChange<-as.data.frame(SurveyChange)
+SurveyChange$Time<-c("Time1","Time2","Time3")
+#Creating line chart to show how allocation of importance changed over time
+
+melted = melt(SurveyChange, id.vars="Time")
+ggplot(data=melted, aes(x=Time, y=value, group=variable, color=variable)) + geom_line() + geom_path(alpha = 0.9)
+```
+
+Modeling and Analysis
+=====================================================
+Logistic Regression Results
+```{r,echo=FALSE,fig.width=8,fig.height=4.0,dpi=300,out.width="1920px",height="1080px"}
+#as.factor(datedata$match)
+#These are the 5 variables we'll use to predict whether or not the decision is a 1(Yes) or 0(No).
+# attr
+# sinc
+# intel
+# fun
+# amb
+
+#Need to make sure it is a continous variable. From handout:"Before we run a regression, the binary response variable needs to be transformed to a cont. variable of wide range."
+
+logistic <- glm(dec ~ attr + sinc + intel + fun + amb, data = datedata, family = "binomial")
+
+summary(logistic)
+```
+
+Random Forest Model
+===========================================
+```{r setup, echo=FALSE}
+#Create a new dataset recording the person's preference and demographical background#
+date1<-datedata[,c(1,3,11:75,82:86,88:98)]
+#Create a new dataset recording the person's partner's demographical background#
+date2<-datedata[,c(1,3,11:12,25:75,82:86,88:98)]
+date3<-merge(date1, date2, by.x=c('iid','pid'), by.y=c('pid','iid'))
+date3<-date3[date3$iid>date3$pid,]
+
+usedate<-date3[,c(5:26,28,30:34,37:40,42:83,97:103,106:152)]
+
+usedate$match<-as.factor(usedate$match)
+usedate$career_c.x<-as.factor(usedate$career_c.x)
+usedate$career_C.y<-as.factor(usedate$career_c.y)
+
+
+for(i in 1:ncol(usedate[,c(2:22,24:25,27:29,34:73,77:79,85:128)])){
+  usedate[is.na(usedate[,i]), i] <- mean(usedate[,i], na.rm = TRUE)
+}
+
+usedate$match<-as.factor(usedate$match)
+
+#Random Forest to identify key contributers.
+set.seed(300)
+options(na.action='na.pass')
+```
+
+```{r, echo = FALSE}
+#Random forest to determine decision
+ctrl <- trainControl(method = "repeatedcv", number = 3, repeats = 3)
+grid_rf <- expand.grid(.mtry = c(3, 9, 18,36))
+usedate$dec.x<-as.factor(usedate$dec.x)
+set.seed(300)
+m_rf_d <- train(dec.x~int_corr + samerace + age_o + race_o + pf_o_att + pf_o_sin + pf_o_int + pf_o_fun + pf_o_amb + pf_o_sha +  age.x + field_cd.x + mn_sat.x + tuition.x + race.x + imprace.x + imprelig.x + income.x + goal.x + date.x + career_c.x + sports.x + tvsports.x + exercise.x + dining.x + museums.x + art.x + hiking.x + gaming.x + clubbing.x +reading.x + tv.x + theater.x + movies.x + concerts.x + music.x + shopping.x + yoga.x + exphappy.x + expnum.x + + attr1_1.x + 
+    sinc1_1.x + intel1_1.x + fun1_1.x + amb1_1.x + shar1_1.x + 
+    attr2_1.x + sinc2_1.x + intel2_1.x + fun2_1.x + amb2_1.x + 
+    attr3_1.x + sinc3_1.x + fun3_1.x + intel3_1.x + amb3_1.x + 
+    attr5_1.x + sinc5_1.x + intel5_1.x + fun5_1.x + amb5_1.x + field_cd.y + mn_sat.y + tuition.y + imprace.y + imprelig.y + income.y + goal.y + date.y + go_out.y + career_c.y + sports.y + tvsports.y + exercise.y + dining.y + museums.y + art.y + hiking.y + gaming.y + clubbing.y + reading.y + tv.y + theater.y + movies.y + concerts.y + music.y + shopping.y + yoga.y + exphappy.y + expnum.y + 
+    attr2_1.y + sinc2_1.y + intel2_1.y + fun2_1.y + amb2_1.y + 
+    attr3_1.y + sinc3_1.y + fun3_1.y + intel3_1.y + amb3_1.y + 
+    attr5_1.y + sinc5_1.y + intel5_1.y + fun5_1.y + amb5_1.y, data = usedate, na.action = 'na.exclude', method = "rf", metric = "Kappa", trControl = ctrl, tuneGrid = grid_rf)
+#The final value used for the model was mtry = 3. The Accuracy is 0.719, Kappa statistic is 0.419, which is pretty good for the a rf model#
+m_rf_d
+
+#Showing the importance of each variables#
+contribution_rf_d<-as.data.frame(importance(m_rf_d$finalModel))
+
+setDT(contribution_rf_d, keep.rownames = TRUE)[]
+contribution_rf_high_d<-contribution_rf_d[contribution_rf_d$MeanDecreaseGini>10.1,]
+```
+
+
+```{r}
+#Present the importance of vairable in bar chart#
+ggplot(contribution_rf_high_d, aes(x=rn,y=MeanDecreaseGini))+geom_bar(stat="identity")+
+     geom_bar(data=subset(contribution_rf_high_d, MeanDecreaseGini==max(MeanDecreaseGini)), aes(rn, MeanDecreaseGini),
+              fill="green", stat="identity")
+```
+
+
+
+```{r, echo = FALSE}
+
+ctrl <- trainControl(method = "repeatedcv", number = 3, repeats = 3)
+usedate$match<-as.factor(usedate$match)
+grid_rf <- expand.grid(.mtry = c(3, 9, 18, 36))
+set.seed(300)
+m_rf <- train(match~int_corr + samerace + age_o + race_o + pf_o_att + pf_o_sin + pf_o_int + pf_o_fun + pf_o_amb + pf_o_sha + age.x + field_cd.x + mn_sat.x + tuition.x + race.x + imprace.x + imprelig.x + income.x + goal.x + date.x + career_c.x + sports.x + tvsports.x + exercise.x + dining.x + museums.x + art.x + hiking.x + gaming.x + clubbing.x +reading.x + tv.x + theater.x + movies.x + concerts.x + music.x + shopping.x + yoga.x + exphappy.x + expnum.x + attr1_1.x + 
+    sinc1_1.x + intel1_1.x + fun1_1.x + amb1_1.x + shar1_1.x + 
+    attr2_1.x + sinc2_1.x + intel2_1.x + fun2_1.x + amb2_1.x + 
+    attr3_1.x + sinc3_1.x + fun3_1.x + intel3_1.x + amb3_1.x + 
+    attr5_1.x + sinc5_1.x + intel5_1.x + fun5_1.x + amb5_1.x + field_cd.y + mn_sat.y + tuition.y + imprace.y + imprelig.y + income.y + goal.y + date.y + go_out.y + career_c.y + sports.y + tvsports.y + exercise.y + dining.y + museums.y + art.y + hiking.y + gaming.y + clubbing.y + reading.y + tv.y + theater.y + movies.y + concerts.y + music.y + shopping.y + yoga.y + exphappy.y + expnum.y + 
+    attr2_1.y + sinc2_1.y + intel2_1.y + fun2_1.y + amb2_1.y + 
+    attr3_1.y + sinc3_1.y + fun3_1.y + intel3_1.y + amb3_1.y + 
+    attr5_1.y + sinc5_1.y + intel5_1.y + fun5_1.y + amb5_1.y , data = usedate, na.action = 'na.exclude', method = "rf", metric = "Kappa", trControl = ctrl, tuneGrid = grid_rf)
+
+#The final value used for the model was mtry = 36. The accuracy is 0.843,which is relatively high#
+m_rf
+#Showing the importance of each variables#
+contribution_rf<-as.data.frame(importance(m_rf$finalModel))
+
+setDT(contribution_rf, keep.rownames = TRUE)[]
+contribution_rf_high<-contribution_rf[contribution_rf$MeanDecreaseGini>7.5,]
+```
+
+
+```{r}
+#Present the importance of vairable in bar chart#
+ggplot(contribution_rf_high, aes(x=rn,y=MeanDecreaseGini))+geom_bar(stat="identity")+
+     geom_bar(data=subset(contribution_rf_high, MeanDecreaseGini==max(MeanDecreaseGini)), aes(rn, MeanDecreaseGini),
+              fill="green", stat="identity")
+
+```
+
+```{r logit models}
+#Logit models to identify the correlation betwween economic power of one person and match#
+library(gmodels)
+logit.model1 <- glm(match ~ tuition.x +  tuition.y + income.y + income.x, data = usedate, family = "binomial",na.action = 'na.exclude')
+
+summary(logit.model1)
+
+```

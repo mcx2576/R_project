@@ -1,0 +1,545 @@
+---
+title: 'Combined Group Project #1'
+author: "Group 8"
+date: "October 18, 2016"
+output: html_document
+---
+#####Installs and reads file. Loads packages: 'plyr', 'dplyr', 'maps', 'ggplot2', 'ggmap', 'mapproj', 'scales', 'RColorBrewer'. 
+
+
+```{r echo =FALSE}
+library(plyr)
+library(dplyr)
+library(maps)
+library(ggplot2)
+library(ggmap)
+library(mapproj)
+library(scales)
+library(RColorBrewer)
+library(data.table)
+bike_data <- read.csv("201508-citibike-tripdata.csv", header = T, sep = ",")
+```
+##Which stations see the more departures than arrivals? 
+```{r echo =FALSE}
+StartHours <- format(as.POSIXct(strptime(bike_data$starttime, "%m/%d/%Y %H:%M:%S", tz="")), format = "%H:%M:%S")
+bike_data$starthours <- StartHours
+
+StartDate <- format(as.POSIXct(strptime(bike_data$starttime, "%m/%d/%Y %H:%M:%S", tz="")), format = "%m/%d/%Y")
+bike_data$startdate <- StartDate
+
+EndHours <- format(as.POSIXct(strptime(bike_data$stoptime, "%m/%d/%Y %H:%M:%S", tz="")), format = "%H:%M:%S")
+bike_data$endhours <- EndHours
+
+EndDate <- format(as.POSIXct(strptime(bike_data$stoptime, "%m/%d/%Y %H:%M:%S", tz="")), format = "%m/%d/%Y")
+bike_data$enddate <- EndDate
+
+calculate.weekday <- function(date) {
+  if(date %in% c("08/02/2015","08/09/2015","08/16/2015","08/23/2015","08/30/2015")) { 
+    Weekday <- "Sun"
+  } else if(date %in% c("08/03/2015","08/10/2015","08/17/2015","08/24/2015", "08/31/2015")) {
+    Weekday <- "Mon"
+  } else if(date %in% c("08/04/2015","08/11/2015","08/18/2015", "08/25/2015")) {
+    Weekday <- "Tue"
+  } else if(date %in% c("08/05/2015","08/12/2015","08/19/2015","08/26/2015")) {
+    Weekday <- "Wed"
+  } else if(date %in% c("08/06/2015","08/13/2015","08/20/2015","08/27/2015")) {
+    Weekday <- "Thur"
+  } else if(date %in% c("08/07/2015","08/14/2015","08/21/2015","08/28/2015")) {
+    Weekday <- "Fri"
+  } else if(date %in% c("08/01/2015","08/08/2015","08/15/2015","08/22/2015","08/29/2015")) {
+    Weekday <- "Sat"
+  } else {
+    Weekday <- "Unknown"
+  }
+  Weekday
+}
+
+bike_data$weekday <- sapply(bike_data$startdate, FUN=calculate.weekday)
+bike_data$weekday <- as.factor(bike_data$weekday)
+bike_data$weekday <- relevel(bike_data$weekday, "Sun")
+bike_data$weekday <- relevel(bike_data$weekday, "Sat")
+bike_data$weekday <- relevel(bike_data$weekday, "Fri")
+bike_data$weekday <- relevel(bike_data$weekday, "Thur")
+bike_data$weekday <- relevel(bike_data$weekday, "Wed")
+bike_data$weekday <- relevel(bike_data$weekday, "Tue")
+bike_data$weekday <- relevel(bike_data$weekday, "Mon")
+
+
+bike_data$start.timeofday <- bike_data$starthours
+bike_data$start.timeofday[bike_data$starthours >= "00:00:00" & bike_data$starthours < "08:00:00"] <- "Early Morning"
+bike_data$start.timeofday[bike_data$starthours >= "08:00:00" & bike_data$starthours < "12:00:00"] <- "Late Morning"
+bike_data$start.timeofday[bike_data$starthours >= "12:00:00" & bike_data$starthours < "16:00:00"] <- "Afternoon"
+bike_data$start.timeofday[bike_data$starthours >= "16:00:00" & bike_data$starthours < "20:00:00"] <- "Evening"
+bike_data$start.timeofday[bike_data$starthours >= "20:00:00" & bike_data$starthours < "24:00:00"] <- "Late Evening"
+
+bike_data$end.timeofday <- bike_data$endHours
+bike_data$end.timeofday[bike_data$endhours >= "00:00:00" & bike_data$endhours < "08:00:00"] <- "Early Morning"
+bike_data$end.timeofday[bike_data$endhours >= "08:00:00" & bike_data$endhours < "12:00:00"] <- "Late Morning"
+bike_data$end.timeofday[bike_data$endhours >= "12:00:00" & bike_data$endhours < "16:00:00"] <- "Afternoon"
+bike_data$end.timeofday[bike_data$endhours >= "16:00:00" & bike_data$endhours < "20:00:00"] <- "Evening"
+bike_data$end.timeofday[bike_data$endhours >= "20:00:00" & bike_data$endhours < "24:00:00"] <- "Late Evening"
+
+bike_data$start.timeofday <- as.factor(bike_data$start.timeofday)
+bike_data$end.timeofday <- as.factor(bike_data$end.timeofday)
+
+bike_data$start.timeofday <- relevel(bike_data$start.timeofday, "Late Evening")
+bike_data$start.timeofday <- relevel(bike_data$start.timeofday, "Evening")
+bike_data$start.timeofday <- relevel(bike_data$start.timeofday, "Afternoon")
+bike_data$start.timeofday <- relevel(bike_data$start.timeofday, "Late Morning")
+bike_data$start.timeofday <- relevel(bike_data$start.timeofday, "Early Morning")
+
+#Trip duration in minutes
+bike_data$tripduration <- bike_data$tripduration/60
+station_start <- table(bike_data$start.station.name) 
+station_end <- table(bike_data$end.station.name)
+station <- merge(station_start, station_end, by.x="Var1", by.y="Var1", all.station_end = TRUE)
+station$asy <- as.numeric(station$Freq.x)-as.numeric(station$Freq.y)
+
+#MAX and MIN of variance in arrivals and departures
+with(station,Var1[which.max(asy)])
+```
+######Which stations have more arrivals than departures? 
+```{r}
+with(station,Var1[which.min(asy)])
+```
+
+
+
+```{r echo =FALSE}
+sttz<-as.data.frame.matrix(table(bike_data$start.station.name,bike_data$start.timeofday))
+ettz<-as.data.frame.matrix(table(bike_data$end.station.name,bike_data$end.timeofday));
+
+stbd<-as.data.frame.matrix(table(bike_data$start.station.name,bike_data$weekday));
+edbd<-as.data.frame.matrix(table(bike_data$end.station.name,bike_data$weekday));
+
+asy_timezones<-merge.data.frame(sttz,ettz,by.x = 0,by.y = 0, all.y = TRUE);
+```
+
+######In the early morning, 8 Ave & 31 St has the greatest asymmetry between departures and arrivals
+```{r echo =FALSE}
+asy_timezones$asy_em<-as.numeric(asy_timezones$`Early Morning.x`)-as.numeric(asy_timezones$`Early Morning.y`);
+with(asy_timezones,Row.names[which.max(asy_em)]); #more departures than arrivals
+```
+
+
+######In the early morning, E 47 St & Park Ave has the greatest asymmetry between arrivals and departures. 
+```{r echo = FALSE}
+with(asy_timezones,Row.names[which.min(asy_em)]); #more arrivals than departures
+```
+
+
+
+######In the late morning, "8 Ave & W 31 St" has the greatest asymmetry between departures and arrivals
+```{r echo = FALSE}
+#Calculate the station with most asymmetric traffic in the late morning#
+asy_timezones$asy_lm<-as.numeric(asy_timezones$`Late Morning.x`)-as.numeric(asy_timezones$`Late Morning.y`); # More departures than arrivals
+with(asy_timezones,Row.names[which.max(asy_lm)])
+```
+
+######In the late morning, "E 17 St & Broadway" has the greatest asymmetry between arrivals and departures
+```{r echo = FALSE}
+with(asy_timezones,Row.names[which.min(asy_lm)]); # More arrivals than departures
+```
+
+
+######In the afternoon, "E 27 St & 1 Ave" has the greatest asymmetry between departures and arrivals 
+```{r echo = FALSE}
+#Calculate the station with most asymmetric traffic in the afternoon#
+asy_timezones$asy_a<-as.numeric(asy_timezones$`Afternoon.x`)-as.numeric(asy_timezones$`Afternoon.y`);with(asy_timezones,Row.names[which.max(asy_a)]);
+```
+######In the afternoon, "W 41 St & 8 Ave" has the greatest asymmetry between arrivals and departures
+```{r echo = FALSE}
+with(asy_timezones,Row.names[which.min(asy_a)]);
+#Calculate the station with most asymmetric traffic in the Evening#
+```
+######In the evening, "Pershing Square South" has the greatest asymmetry between departures and arrivals
+```{r echo = FALSE}
+asy_timezones$asy_e<-as.numeric(asy_timezones$`Evening.x`)-as.numeric(asy_timezones$`Evening.y`);with(asy_timezones,Row.names[which.max(asy_e)]);
+```
+
+######In the evening, "8 Ave & W 31 St" has the greatest asymmetry between arrivals and departures
+```{r echo = FALSE}
+with(asy_timezones,Row.names[which.min(asy_e)]);
+```
+######In the late evening, "W 20 St & 11 Ave" has the greatest asymmetry between departures and arrivals
+```{r echo = FALSE}
+#Calculate the station with most asymmetric traffic in the late evening#
+asy_timezones$asy_le<-as.numeric(asy_timezones$`Late Evening.x`)-as.numeric(asy_timezones$`Late Evening.y`);with(asy_timezones,Row.names[which.max(asy_le)]);
+```
+######In the late evening, "E 7 St & Avenue A" has the greatest asymmetry between arrivals and departures
+```{r echo = FALSE}
+with(asy_timezones,Row.names[which.min(asy_le)]);
+```
+######On Monday, "8 Ave & W 31 St" has the greatest asymmetry between departures and arrivals
+```{r echo = FALSE}
+
+asy_days<-merge.data.frame(stbd,edbd,by.x = 0,by.y = 0, all.y = TRUE);
+#Calculate the asymmetric traffic on Monday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_M<-as.numeric(asy_days$Mon.x)-as.numeric(asy_days$Mon.y);with(asy_days,Row.names[which.max(asy_M)]);
+```
+######On Monday,  "W 33 St & 7 Ave"has the greatest asymmetry between arrivals and departures
+```{r echo = FALSE}
+with(asy_days,Row.names[which.min(asy_M)]);
+```
+######On Tuesday,  "8 Ave & W 31 St" has the greatest asymmetry between departures and arrivals
+```{r echo = FALSE}
+#Calculate the asymmetric traffic on Tuesday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_Tu<-as.numeric(asy_days$Tue.x)-as.numeric(asy_days$Tue.y);with(asy_days,Row.names[which.max(asy_Tu)]);
+```
+######On Tuesday, "E 7 St & Avenue A" has the greatest asymmetry between arrivals and departures
+```{r echo = FALSE}
+with(asy_days,Row.names[which.min(asy_Tu)]); 
+```
+######On Wednesday, "8 Ave & W 31 St" has the greatest asymmetry between departures and arrivals
+```{r echo = FALSE}
+#Calculate the asymmetric traffic on Wednesday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_W<-as.numeric(asy_days$Wed.x)-as.numeric(asy_days$Wed.y);with(asy_days,Row.names[which.max(asy_W)]);
+```
+######On Wednesday, "E 7 St & Avenue A" has the greatest asymmetry between arrivals and departures
+```{r echo = FALSE}
+with(asy_days,Row.names[which.min(asy_W)]);
+```
+######On Thursday, "8 Ave & W 31 St" has the greatest asymmetry between departures and arrivals
+```{r echo = FALSE}
+ #Calculate the asymmetric traffic on Thursday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_Tur<-as.numeric(asy_days$Thur.x)-as.numeric(asy_days$Thur.y);with(asy_days,Row.names[which.max(asy_Tur)]);
+```
+######On Thursday, "W 33 St & 7 Ave" has the greatest asymmetry between arrivals and departures
+```{r echo = FALSE}
+with(asy_days,Row.names[which.min(asy_Tur)]);
+```
+######On Friday, "W 42 St & 8 Ave"has the greatest asymmetry between departures and arrivals
+```{r echo = FALSE}
+#Calculate the asymmetric traffic on Friday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_F<-as.numeric(asy_days$Fri.x)-as.numeric(asy_days$Fri.y);with(asy_days,Row.names[which.max(asy_F)]);
+```
+######On Friday, "W 33 St & 7 Ave"has the greatest asymmetry between arrivals and departures
+```{r echo = FALSE}
+with(asy_days,Row.names[which.min(asy_F)]);
+```
+######On Saturday, "W 42 St & 8 Ave"has the greatest asymmetry between departures and arrivals
+```{r echo = FALSE}
+#Calculate the asymmetric traffic on Saturday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_Sa<-as.numeric(asy_days$Sat.x)-as.numeric(asy_days$Sat.y);with(asy_days,Row.names[which.max(asy_Sa)]);
+```
+######On Saturday, "Centre St & Chambers St" has the greatest asymmetry between arrivals and departures
+```{r echo = FALSE}
+with(asy_days,Row.names[which.min(asy_Sa)]);
+```
+######On Sunday, "8 Ave & W 31 St" has the greatest asymmetry between arrivals and departures
+```{r echo = FALSE}
+#Calculate the asymmetric traffic on Sunday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_Su<-as.numeric(asy_days$Sun.x)-as.numeric(asy_days$Sun.y);with(asy_days,Row.names[which.max(asy_Su)]);
+```
+######On Saturday, "Central Park S & 6 Ave" has the greatest asymmetry between arrivals and departures
+```{r echo = FALSE}
+with(asy_days,Row.names[which.min(asy_Su)]);
+```
+##########From Sunday to Monday, it is obvious that "8 Ave & W 31 St" station has the most asymmetric traffic effect for departures than arrivals, and it also holds for the early morning and late morning scenarios. This station has most asymmetric traffic effect for arrivals than departures in the evening
+From Sunday to Monday, either "E 7 St & Avenue A" or "W 33 St & 7 Ave" stations has the most arrivals asymmetric traffic effect for than departures.
+
+
+## Part 2:
+#Data Visualization
+```{r echo = FALSE}
+#Data Setup and Clean
+
+bikedata815 <- read.csv("201508-citibike-tripdata.csv")
+
+#Map 1: SHOW POPULAR START STATIONS on MAP 
+
+#Start with Popular Starting Destinations - Frequency of appearances of each Start Station Name
+by_startstation <- group_by(bikedata815, start.station.name)
+detach("package:plyr", unload=TRUE) 
+frequency_start <- summarise(by_startstation, count = n())
+
+#Create a dataframe with just start station name and the locations of each
+start_locations <- select(bikedata815, start.station.name, start.station.latitude, start.station.longitude)
+
+start_locations_unique <- distinct(start_locations, start.station.name, start.station.latitude, start.station.longitude)
+
+
+#Merge the 2 data frames we've just created in order to have a full picture of how frequent each start station is used and where it is locatd on the map.
+#This will be the merged data frame that will be used when plotting the map. 
+start_station <- merge(frequency_start, start_locations_unique, by="start.station.name")
+
+#start_station contains all of the station information 
+```
+
+
+```{r echo = FALSE}
+#Map
+#Sometimes graphics display is glitchy
+dev.off() 
+#Inserts searched map of New York City into variable mapny
+mapny_start <- get_map(location = "Empire State Building", zoom = 12, color = "bw")
+#Displays map
+ggmap(mapny_start)
+points_start <- ggmap(mapny_start) + geom_point(data = start_station, aes(x=start_station$start.station.longitude, y=start_station$start.station.latitude, color =start_station$count, stroke = 1.2)) + labs(title = "Popular Starting Stations", x = "Longitude", y = "Latitude") + scale_colour_continuous(name = "Frequency")
+points_start
+
+
+```
+
+
+```{r echo = FALSE}
+#MAP 2: SHOW POPULAR END STATIONS ON MAP 
+#Start with Popular Starting Destinations - Frequency of appearances of each end Station Name
+library(dplyr)
+by_endstation <- group_by(bike_data, end.station.name)
+frequency_end <- summarise(by_endstation, count = n())
+#Create a dataframe with just end station names and the locations of each
+end_locations <- select(bike_data, end.station.name, end.station.latitude, end.station.longitude)
+end_locations_unique <- distinct(end_locations, end.station.name, end.station.latitude, end.station.longitude)
+#Merge the 2 data frames we've just created in order to have a full picture of how frequent each start station is used and where it is locatd on the map. 
+#Merge the 2 data frames for use in mapping
+end_station <- merge(frequency_end, end_locations_unique, by="end.station.name")
+#END_STATION contains the count of how many times people ended at each station. 
+```
+
+
+
+```{r echo = FALSE}
+#PART 2: Second Bullet
+#Show stations with a surplus(more starts than ends) and defecit(more ends than starts)
+#start_station and end_station are the 2 data frames that have been cleaned and the ones we'll use below. 
+#need to change the names of count to make the data frames available for merging
+start_station_mer <- start_station
+start_station_mer <- rename(start_station_mer, start_count = count)
+start_station_mer <- rename(start_station_mer, station_name = start.station.name)
+start_station_mer <- arrange(start_station_mer, station_name)
+
+end_station_mer <- end_station
+end_station_mer <- rename(end_station_mer, end_count = count)
+end_station_mer <- rename(end_station_mer, station_name = end.station.name)
+end_station_mer <- arrange(end_station_mer, station_name)
+```
+
+``` {r echo = FALSE}
+#start_station_mer and end_station_mer are now in a format where we can use merge to put them in one data frame. Time to calculate the surplus and defecits.
+variance <- merge(start_station_mer, end_station_mer, by="station_name")
+
+#Need to add the surplus and defecit calculations. more_starts is the calculation of how many more starts there were at the station compared to how many ends. more_ends is the calculation of how many more ends there were at the station compared to how many starts. 
+variance <- mutate(variance, more_starts = start_count - end_count, more_ends = end_count - start_count)
+
+
+
+#Want to map the destinations that have 100 or more starts than ends.Labeling the variable to use this: top_starts.
+top_starts <- filter(variance, more_starts > 100)
+
+```
+
+```{r echo = FALSE}
+#Inserts searched map of New York City into variable mapny
+mapny_topstarts <- get_map(location = "Empire State Building", zoom = 12, color = "bw")
+#Displays map
+ggmap(mapny_topstarts)
+```
+
+
+#####Map of places where people start more than they end
+```{r echo = FALSE}
+points_topstarts <- ggmap(mapny_topstarts) + geom_point(data = top_starts, aes(x=top_starts$start.station.longitude, y=top_starts$start.station.latitude, color ="red", alpha = 1, size = top_starts$more_starts)) + labs(title = "People start here more often than they end", x = "Longitude", y = "Latitude")
+points_topstarts
+```
+
+```{r echo = FALSE}
+#To show the locations that have many more ends than starts, we've already cleaned the data via variance. 
+top_ends <- filter(variance, more_ends > 100)
+```
+
+```{r echo = FALSE}
+#Map of places where people end more than they start 
+#Inserts searched map of New York City into variable mapny
+mapny_topends <- get_map(location = "Empire State Building", zoom = 12, color = "bw")
+#Displays map
+ggmap(mapny_topends)
+```
+
+#####Map where they end more than they start
+```{r echo = FALSE}
+points_topends <- ggmap(mapny_topends) + geom_point(data = top_ends, aes(x=top_ends$end.station.longitude, y=top_ends$end.station.latitude, color ="red", alpha = 1, size = top_ends$more_ends)) + labs(title = "People end here more often than they start here", x = "Longitude", y = "Latitude")
+points_topends
+```
+
+
+
+
+
+
+
+
+
+
+######Which stations originate the longest rides? Does this vary by time of day?
+
+
+```{r echo = FALSE}
+bike_data$start_stations.factored <- as.factor(bike_data$start.station.name)
+station_duration <- tapply(bike_data$tripduration, bike_data$start_stations.factored, mean, na.rm = TRUE)
+
+```
+
+######Average trip durations based on time of day
+
+
+```{r echo = FALSE}
+#Create BarPlot showing average trip durations based on time of day
+tripduration.timedata <- tapply(bike_data$tripduration, bike_data$start.timeofday, mean, na.rm = TRUE)
+barplot(tripduration.timedata, main = "Mean Trip Durations by Time of Day", ylab = "Duration (min)", ylim = c(0,20),
+        col = brewer.pal(n = 5, name = "Blues"), sub = "August 2015 CitiBike Data")
+```
+
+
+######Average trip durations by day of the week
+```{r echo = FALSE}
+tripduration.daydata <- tapply(bike_data$tripduration, bike_data$weekday, mean, na.rm = TRUE)
+barplot(tripduration.daydata, main = "Mean Trip Durations by Day of Week", ylab = "Duration (min)", ylim = c(0,25),
+        col = brewer.pal(n = 7, name = "Blues"), sub = "August 2015 CitiBike Data")
+```
+
+
+
+#####Which stations originate the longest rides? Below shows the top 5 stations with longest rides, on average
+```{r echo = FALSE}
+bike_data$start_stations.factored <- as.factor(bike_data$start.station.name)
+station_duration <- tapply(bike_data$tripduration, bike_data$start.station.name, mean, na.rm = TRUE)
+station_duration <- sort(station_duration, decreasing = TRUE) 
+head(station_duration,5)
+```
+
+#####Does this vary by time of day?
+```{r echo = FALSE}
+bike_data.earlymorning <- filter(bike_data, start.timeofday == "Early Morning")
+bike_data.latemorning <- filter(bike_data, start.timeofday == "Late Morning")
+bike_data.afternoon <- filter(bike_data, start.timeofday == "Afternoon")
+bike_data.evening <- filter(bike_data, start.timeofday == "Evening")
+bike_data.lateevening <- filter(bike_data, start.timeofday == "Late Evening")
+```
+
+#####Top 3 Longest Early Morning Trips
+```{r echo = FALSE}
+earlymorning_duration <- tapply(bike_data.earlymorning$tripduration, bike_data.earlymorning$start.station.name,
+                                mean, na.rm = TRUE)
+earlymorning_duration <- sort(earlymorning_duration, decreasing = TRUE); head(earlymorning_duration, 3)
+```
+
+#####Top 3 Longest Late Morning Trips
+```{r echo = FALSE}
+latemorning_duration <- tapply(bike_data.latemorning$tripduration, bike_data.latemorning$start.station.name,
+                                mean, na.rm = TRUE)
+latemorning_duration <- sort(latemorning_duration, decreasing = TRUE); head(latemorning_duration, 3)
+```
+
+#####Top 3 Longest Afternoon Trips
+```{r echo = FALSE}
+afternoon_duration <- tapply(bike_data.afternoon$tripduration, bike_data.afternoon$start.station.name,
+                                mean, na.rm = TRUE)
+afternoon_duration <- sort(afternoon_duration, decreasing = TRUE); head(afternoon_duration, 3)
+```
+
+#####Top 3 Longest Evening Trips
+```{r echo = FALSE}
+evening_duration <- tapply(bike_data.evening$tripduration, bike_data.evening$start.station.name,
+                                mean, na.rm = TRUE)
+evening_duration <- sort(evening_duration, decreasing = TRUE); head(evening_duration, 3)
+```
+
+#####Longest Late Evening Trips
+```{r echo = FALSE}
+lateevening_duration <- tapply(bike_data.lateevening$tripduration, bike_data.lateevening$start.station.name,
+                                mean, na.rm = TRUE)
+lateevening_duration <- sort(lateevening_duration, decreasing = TRUE); head(lateevening_duration, 3)
+```
+
+
+######Count of bike usage by gender
+```{r echo = FALSE}
+bike_data$gender <- as.factor(bike_data$gender)
+levels(bike_data$gender) <- c("Unknown", "Male", "Female")
+ggplot(bike_data, aes(x=gender, fill=usertype)) + geom_bar() + ggtitle("Count of Bike Rental by Gender") + labs(x="Gender", y="Count", fill="User Type") + geom_text(stat = "count", aes(label=..count..)) + scale_y_continuous(labels=comma)
+```
+
+######It is important to note that customers do not have the ability to share their gender. As a result, 220,996 points of data are of "Unknown" gender. An additional 1330 subscribers chose not to enter their gender. The remaining breakdown is from the subscribers. The data shows us that males rent a bike on average over 3 times more than females do. Many factors may contribute to this such as gender stereotypes, offices near bike stations, etc. However, none of these factors are measured by citi bike data. 
+
+
+
+
+######Count of bike usage by birth year
+```{r echo = FALSE}
+bike_data$birth.year <- as.factor(bike_data$birth.year)
+ggplot(na.omit(bike_data), aes(x=birth.year, fill=usertype)) + geom_bar() + ggtitle("Count of Bike Rental by Birth Year") + labs(x="Birth Year", y="Count", fill = "User Type") + scale_x_discrete(breaks=seq(1875,2000,10))
+```
+
+######Once again, we only have birth year data for subscribers. The breakdown in birth year shows us that the highest frequency of users comes from individuals born from 1980-1990, or 25-35 year olds. More specifically, we see a spike in usage from individuals who are 23 (1992) years old, in other words new, young working professionals. Then, the greatest spike lies with individuals who are 30 years old (1985), declining in age from that point on. We would be interested to see how this distribution would differ in other cities where other forms of vehicle transportation may be faster than in New York City, since slow vehicle transportation may encourage more individuals of all ages to rent bikes.
+
+######Bar chart of user type
+```{r echo = FALSE}
+ggplot(bike_data, aes(x=usertype, fill=usertype)) + geom_bar() + ggtitle("Count of UserType") + labs(x="User Type", y="Count") + geom_text(stat = "count", aes(label=..count..))
+```
+
+######This bar graph demonstrates that a large majority of the data comes from subscribers, even in a warm summer vacation month like August. As a result, this means Citi Bike should focus in on the stations and bikes used most frequently by subscribers, since the use would be more continual and frequent.
+
+######Frequency of Bike Rental by Weekday and User Type
+```{r echo = FALSE}
+ggplot(bike_data, aes(x=weekday, fill=usertype)) + geom_bar() + ggtitle("Frequency of Bike Rental by Weekday") + labs(x="Weekday", y="Count", fill = "User Type") + geom_text(stat = "count", aes(label=..count..))
+```
+
+######This data is incredibly insightful. It shows us the breakdown of user type on different weekdays. Looking at customers, we can see a few things. Firstly, the customer count is substantially lower than the user count on each day of the week. This is likely due to the needs of customers, who are more likely to be visitors of NYC rather than locals. Secondly, we see great spikes in use on Saturday and Sunday, likely accounting for all of the vacationers looking to travel around the city on the weekend. The spikes in use account for almost a third of all users on Saturday and Sunday.
+
+######The subscriber data is much more interesting. We see that on Mondays, there is a much larger use of bikes than any other weekday. Our analysis attributes this to employees who likely wake up on Monday morning, ready to start off a new week, and eager to be healthier or more environmentally friendly. To achieve these goals, subscribers bike to or from work. However, much like any new goal, people encounter obstacles. Likely, it is easier to drive or take public transportation to work. Those who thought it was challenging to bike on Monday choose not to on Tuesday. The result is an almost 40,000 drop in the number of users on Tuesday. Eventually, this number recovers and use is consistent across the remaining weekdays. Additionally, subscriber use is fairly constant across weekend days as well.
+
+######Trip Duration by User Type
+```{r echo = FALSE}
+#Full data set
+ggplot(bike_data, aes(x=usertype, y=tripduration)) + geom_boxplot() + labs(x= "User Type", y="Trip Duration") + ggtitle("Trip Duration by User Type")
+```
+
+######These box plots demonstrate the trip duration of each user type. However, this data really only provides us with the greatest outliers. The grand majority of data points appear to have a trip duration of time zero, but we know realistically this cannot be the case. As a result, we need to look at the data without the outliers.
+
+
+#####Trip Duration by User Type excluding outliers
+```{r echo = FALSE}
+#EXCLUDING outliers
+ggplot(bike_data, aes(x=usertype, y=tripduration)) + geom_boxplot() + scale_y_continuous(limits = c(0,100)) + labs(x="User Type", y="Trip Duration (Minutes)") + ggtitle("Trip Duration Distribution by User Type")
+```
+
+######This data provides the bulk of our quartiles, showing that the average trip duration for customers tends to be longer than subscribers. This is particularly interesting because at this point we know there are fewer customers than subscribers. Our group interpreted this data to show the habits of each user type. Customers, likely vacationers, are likely travelling more leisurely and therefore taking a longer time. They are also more likely to be lost. This means their average trip duration is longer. Subscribers on the other hand are likely taking shorter, more frequent trips between places like the train station and their office. 
+
+
+```{r echo = FALSE}
+#Checking the assumption that some bikes are used more than others, leading to difficult maintenance
+
+#Factoring Bike ID
+bike_data$bikeidfactor<-as.factor(bike_data$bikeid) 
+nlevels(bike_data$bikeidfactor)
+
+#Calculating duration and frequency by Bike ID
+uniquebikedata<-tapply(bike_data$tripduration,bike_data$bikeidfactor,sum) 
+freq<-table(bike_data$bikeidfactor)
+freq<-data.frame(freq)
+uniquebikedata<-cbind(uniquebikedata,freq[,2])
+uniquebikedata<-data.frame(uniquebikedata)
+uniquebikedata<-setDT(uniquebikedata, keep.rownames = TRUE)[]
+colnames(uniquebikedata)<-c("bike id","duration","frequency")
+
+#Graphing Bike ID data
+
+#We can see from the boxplots that in both duration and frequency, there are a number of bikes that are more heavily used that the average. This seems to be a more extreme disparity in frequency than duration, meaning some bikes may be ridden a greater number of times for a shorter average distance.
+
+#In the scatter plots, we see that Bike IDs that are higher than 22000 have by far the highest number of rides. This contributes to a slightly higher average number of minutes ridden on higher bike IDs. You can see the increasing trendline in black between frequency and bike ID in the second scatter plot. There are also several outliers with high durations across all bike IDs. In general, bikes with higher ID numbers may require more maintenance due to their placement, model type, or other factors that contribute to higher use.
+```
+
+```{r echo = FALSE}
+par(mfrow=c(2,2))
+boxplot(uniquebikedata$duration,main="Boxplot of Duration by Bike ID")
+boxplot(uniquebikedata$frequency,main="Boxplot of Frequency by Bike ID")
+scatter.smooth(uniquebikedata$`bike id`,uniquebikedata$duration,xlab="Bike ID",ylab="Total Duration in Minutes",main="Duration by Bike ID",col="orange",pch=2, cex.main=1.5)
+scatter.smooth(uniquebikedata$`bike id`,uniquebikedata$frequency,xlab="Bike ID",ylab="Total Number of Trips",main="Frequency by Bike ID",col="orange",pch=2, cex.main=1.5)
+```
+
+
+
+
+
+

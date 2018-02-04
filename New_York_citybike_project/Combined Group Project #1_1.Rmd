@@ -1,0 +1,332 @@
+---
+title: 'Combined Group Project #1'
+author: "Mara VanSickle"
+date: "October 18, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#STARTING
+#Installs
+install.packages("plyr"); library("plyr")
+library(dplyr)
+library(maps)
+library(ggplot2)
+install.packages("ggmap"); library(ggmap)
+library(mapproj)
+library(scales)
+library(RColorBrewer)
+
+#Read File
+bike_data <- read.csv("201508-citibike-tripdata.csv", header = T, sep = ",")
+
+
+#Restructure dates and times
+StartHours <- format(as.POSIXct(strptime(bike_data$starttime, "%m/%d/%Y %H:%M:%S", tz="")), format = "%H:%M:%S")
+bike_data$starthours <- StartHours
+
+StartDate <- format(as.POSIXct(strptime(bike_data$starttime, "%m/%d/%Y %H:%M:%S", tz="")), format = "%m/%d/%Y")
+bike_data$startdate <- StartDate
+
+EndHours <- format(as.POSIXct(strptime(bike_data$stoptime, "%m/%d/%Y %H:%M:%S", tz="")), format = "%H:%M:%S")
+bike_data$endhours <- EndHours
+
+EndDate <- format(as.POSIXct(strptime(bike_data$stoptime, "%m/%d/%Y %H:%M:%S", tz="")), format = "%m/%d/%Y")
+bike_data$enddate <- EndDate
+
+
+#Calculate Weekdays
+calculate.weekday <- function(date) {
+  if(date %in% c("08/02/2015","08/09/2015","08/16/2015","08/23/2015","08/30/2015")) { 
+    Weekday <- "Sun"
+  } else if(date %in% c("08/03/2015","08/10/2015","08/17/2015","08/24/2015", "08/31/2015")) {
+    Weekday <- "Mon"
+  } else if(date %in% c("08/04/2015","08/11/2015","08/18/2015", "08/25/2015")) {
+    Weekday <- "Tue"
+  } else if(date %in% c("08/05/2015","08/12/2015","08/19/2015","08/26/2015")) {
+    Weekday <- "Wed"
+  } else if(date %in% c("08/06/2015","08/13/2015","08/20/2015","08/27/2015")) {
+    Weekday <- "Thur"
+  } else if(date %in% c("08/07/2015","08/14/2015","08/21/2015","08/28/2015")) {
+    Weekday <- "Fri"
+  } else if(date %in% c("08/01/2015","08/08/2015","08/15/2015","08/22/2015","08/29/2015")) {
+    Weekday <- "Sat"
+  } else {
+    Weekday <- "Unknown"
+  }
+  Weekday
+}
+bike_data$weekday <- sapply(bike_data$startdate, FUN=calculate.weekday)
+bike_data$weekday <- as.factor(bike_data$weekday)
+bike_data$weekday <- relevel(bike_data$weekday, "Sun")
+bike_data$weekday <- relevel(bike_data$weekday, "Sat")
+bike_data$weekday <- relevel(bike_data$weekday, "Fri")
+bike_data$weekday <- relevel(bike_data$weekday, "Thur")
+bike_data$weekday <- relevel(bike_data$weekday, "Wed")
+bike_data$weekday <- relevel(bike_data$weekday, "Tue")
+bike_data$weekday <- relevel(bike_data$weekday, "Mon")
+summary(bike_data$weekday)
+
+
+#Time of day calculation
+bike_data$start.timeofday <- bike_data$starthours
+bike_data$start.timeofday[bike_data$starthours >= "00:00:00" & bike_data$starthours < "08:00:00"] <- "Early Morning"
+bike_data$start.timeofday[bike_data$starthours >= "08:00:00" & bike_data$starthours < "12:00:00"] <- "Late Morning"
+bike_data$start.timeofday[bike_data$starthours >= "12:00:00" & bike_data$starthours < "16:00:00"] <- "Afternoon"
+bike_data$start.timeofday[bike_data$starthours >= "16:00:00" & bike_data$starthours < "20:00:00"] <- "Evening"
+bike_data$start.timeofday[bike_data$starthours >= "20:00:00" & bike_data$starthours < "24:00:00"] <- "Late Evening"
+
+bike_data$end.timeofday <- bike_data$endHours
+bike_data$end.timeofday[bike_data$endhours >= "00:00:00" & bike_data$endhours < "08:00:00"] <- "Early Morning"
+bike_data$end.timeofday[bike_data$endhours >= "08:00:00" & bike_data$endhours < "12:00:00"] <- "Late Morning"
+bike_data$end.timeofday[bike_data$endhours >= "12:00:00" & bike_data$endhours < "16:00:00"] <- "Afternoon"
+bike_data$end.timeofday[bike_data$endhours >= "16:00:00" & bike_data$endhours < "20:00:00"] <- "Evening"
+bike_data$end.timeofday[bike_data$endhours >= "20:00:00" & bike_data$endhours < "24:00:00"] <- "Late Evening"
+
+bike_data$start.timeofday <- as.factor(bike_data$start.timeofday)
+bike_data$end.timeofday <- as.factor(bike_data$end.timeofday)
+
+
+#Trip duration in minutes
+bike_data$tripduration <- bike_data$tripduration/60
+
+#AGE
+
+#(Don't change the code above without asking the group!!!!!!!)
+
+#-------------------------
+
+#CHANGXIN
+#Which stations see the most asymmetric traffic (more arrivals than departures and vice versa)? Does this change with time of day and day of the week?#
+
+station_start <- table(bike_data$start.station.name) 
+station_end <- table(bike_data$end.station.name)
+station <- merge(station_start, station_end, by.x="Var1", by.y="Var1", all.station_end = TRUE)
+station$asy <- as.numeric(station$Freq.x)-as.numeric(station$Freq.y)
+
+#MAX and MIN of variance in arrivals and departures
+with(station,Var1[which.max(asy)]); with(station,Var1[which.min(asy)]);
+
+
+
+sttz<-as.data.frame.matrix(table(bike_data$start.station.name,bike_data$start.timeofday))
+ettz<-as.data.frame.matrix(table(bike_data$end.station.name,bike_data$end.timeofday));
+
+
+
+stbd<-as.data.frame.matrix(table(bike_data$start.station.name,bike_data$weekday));
+edbd<-as.data.frame.matrix(table(bike_data$end.station.name,bike_data$weekday));
+
+asy_timezones<-merge.data.frame(sttz,ettz,by.x = 0,by.y = 0, all.y = TRUE);
+asy_timezones<-merge.data.frame(sttz,ettz,by.x = 0,by.y = 0, all.y = TRUE);
+#Calculate the station with most asymmetric traffic in the early morning#
+asy_timezones$asy_em<-as.numeric(asy_timezones$`Early Morning.x`)-as.numeric(asy_timezones$`Early Morning.y`);
+with(asy_timezones,Row.names[which.max(asy_em)]);
+with(asy_timezones,Row.names[which.min(asy_em)]);
+
+#Calculate the station with most asymmetric traffic in the late morning#
+asy_timezones$asy_lm<-as.numeric(asy_timezones$`Late Morning.x`)-as.numeric(asy_timezones$`Late Morning.y`);
+with(asy_timezones,Row.names[which.max(asy_lm)]);with(asy_timezones,Row.names[which.min(asy_lm)]);
+#Calculate the station with most asymmetric traffic in the afternoon#
+asy_timezones$asy_a<-as.numeric(asy_timezones$`Afternoon.x`)-as.numeric(asy_timezones$`Afternoon.y`);with(asy_timezones,Row.names[which.max(asy_a)]);with(asy_timezones,Row.names[which.min(asy_a)]);
+#Calculate the station with most asymmetric traffic in the Evening#
+asy_timezones$asy_e<-as.numeric(asy_timezones$`Evening.x`)-as.numeric(asy_timezones$`Evening.y`);with(asy_timezones,Row.names[which.max(asy_e)]);with(asy_timezones,Row.names[which.min(asy_e)]);
+#Calculate the station with most asymmetric traffic in the late evening#
+asy_timezones$asy_le<-as.numeric(asy_timezones$`Late Evening.x`)-as.numeric(asy_timezones$`Late Evening.y`);with(asy_timezones,Row.names[which.max(asy_m)]);with(asy_timezones,Row.names[which.min(asy_m)]);
+
+
+asy_days<-merge.data.frame(stbd,edbd,by.x = 0,by.y = 0, all.y = TRUE);
+#Calculate the asymmetric traffic on Monday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_M<-as.numeric(asy_days$Mon.x)-as.numeric(asy_days$Mon.y);with(asy_days,Row.names[which.max(asy_M)]);with(asy_days,Row.names[which.min(asy_M)]);
+#Calculate the asymmetric traffic on Tuesday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_Tu<-as.numeric(asy_days$Tue.x)-as.numeric(asy_days$Tue.y);with(asy_days,Row.names[which.max(asy_Tu)]);with(asy_days,Row.names[which.min(asy_Tu)]); 
+#Calculate the asymmetric traffic on Wednesday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_W<-as.numeric(asy_days$Wed.x)-as.numeric(asy_days$Wed.y);with(asy_days,Row.names[which.max(asy_W)]);with(asy_days,Row.names[which.min(asy_W)]);
+ #Calculate the asymmetric traffic on Thursday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_Tur<-as.numeric(asy_days$Thur.x)-as.numeric(asy_days$Thur.y);with(asy_days,Row.names[which.max(asy_Tur)]);with(asy_days,Row.names[which.min(asy_Tur)]);
+#Calculate the asymmetric traffic on Friday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_F<-as.numeric(asy_days$Fri.x)-as.numeric(asy_days$Fri.y);with(asy_days,Row.names[which.max(asy_F)]);with(asy_days,Row.names[which.min(asy_F)]);
+#Calculate the asymmetric traffic on Saturday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_Sa<-as.numeric(asy_days$Sat.x)-as.numeric(asy_days$Sat.y);with(asy_days,Row.names[which.max(asy_Sa)]);with(asy_days,Row.names[which.min(asy_Sa)]);
+#Calculate the asymmetric traffic on Sunday, 1. Departures>Arrivals 2. Arrivals>Departures#
+asy_days$asy_Su<-as.numeric(asy_days$Sun.x)-as.numeric(asy_days$Sun.y);with(asy_days,Row.names[which.max(asy_Su)]);with(asy_days,Row.names[which.min(asy_Su)]);
+
+
+#--------------------
+
+#MATT
+start_stations <- table(bike_data$start.station.name)
+end_stations <- table(bike_data$end.station.name)
+assymetric <- merge(start_stations, end_stations, by= "Var1")
+assymetric$variance <- assymetric$Freq.x - assymetric$Freq.y
+
+
+# Which stations originate the longest rides? Does this vary by time of day?
+
+bike_data$tripduration <- bike_data$tripduration/60
+
+bike_data$start_stations.factored <- as.factor(bike_data$start.station.name)
+station_duration <- tapply(bike_data$tripduration, bike_data$start_stations.factored, mean, na.rm = TRUE)
+
+
+tapply(bike_data$tripduration, bike_data$start.timeofday, mean, na.rm = TRUE)
+
+
+#----------------
+#MARA
+
+#Count of bike usage by gender
+bike_data$gender <- as.factor(bike_data$gender)
+levels(bike_data$gender)
+levels(bike_data$gender) <- c("Unknown", "Male", "Female")
+ggplot(bike_data, aes(x=gender, fill=usertype)) + geom_bar() + ggtitle("Frequency of Bike Rental by Gender") + labs(x="Gender", y="Count", fill="User Type")
+
+#Count of bike usage by birth year
+bike_data$birth.year <- as.factor(bike_data$birth.year)
+ggplot(na.omit(bike_data), aes(x=birth.year)) + geom_bar() + ggtitle("Frequency of Bike Rental by Birth Year") + labs(x="Birth Year", y="Count") + scale_x_discrete(breaks=seq(1885,2000,10))
+
+#Count of bike usage by AGE
+bike_data$birth.year <- as.numeric(bike_data$birth.year)
+bike_data$birth.year <- 2015 - bike_data$birth.year
+bike_data$age <- (bike_data$birth.year*(-1) + 2015)
+bike_data$age <- as.factor(bike_data$age)
+ggplot(na.omit(bike_data), aes(x=age)) + geom_bar() + ggtitle("Frequency of Bike Rental by Age") + labs(x="Age", y="Count") + scale_x_discrete(breaks=seq(0,85,10))
+
+#Pie chart of usertype. Want to break down by week and weekend dates in August 2015.
+factored.usertype <- as.factor(bike_data$usertype)
+pie(summary(factored.usertype))
+
+
+
+#Frequency by Weekday
+barplot(summary(bike_data$weekday) / 1000, ylim = c(0,200), main = "Total # Bikes Used / Weekday", xlab = "Day of the Week", ylab = "Frequency in thousands")
+
+#TRY TO FIND THE AVERAGE NUMBER TAKEN OUT ON EACH DAY OF THE WEEK
+ 
+ 
+#User type by Weekday
+ggplot(bike_data, aes(x=weekday, fill=usertype)) + geom_bar() + ggtitle("Frequency of Bike Rental by Weekday") + labs(x="Weekday", y="Count")
+
+#Mileage by customer type
+
+
+#---------------------
+
+#ALEC
+
+#Map 1: SHOW POPULAR START STATIONS on MAP 
+
+#Start with Popular Starting Destinations - Frequency of appearances of each Start Station Name
+by_startstation <- group_by(bike_data, start.station.name)
+frequency_start <- summarise(by_startstation, count = n())
+
+#Create a dataframe with just start station name and the locations of each
+start_locations <- select(bike_data, start.station.name, start.station.latitude, start.station.longitude)
+
+start_locations_unique <- distinct(start_locations, start.station.name, start.station.latitude, start.station.longitude)
+View(start_locations_unique)
+View(frequency_start)
+
+
+#Merge the 2 data frames we've just created in order to have a full picture of how frequent each start station is used and where it is locatd on the map.
+#This will be the merged data frame that will be used when plotting the map. 
+start_station <- merge(frequency_start, start_locations_unique, by="start.station.name")
+
+#start_station contains all of the station information 
+```
+
+
+```{r}
+#Map
+
+#Sometimes graphics display is glitchy
+dev.off() 
+#Inserts searched map of New York City into variable mapny
+mapny_start <- get_map(location = "Empire State Building", zoom = 12, color = "bw")
+#Displays map
+ggmap(mapny_start)
+points_start <- ggmap(mapny_start) + geom_point(data = start_station, aes(x=start_station$start.station.longitude, y=start_station$start.station.latitude, color ="red", alpha = 1, size = start_station$count)) + labs(title = "Popular Starting Stations", x = "Longitude", y = "Latitude")
+
+
+points_start
+
+#Next Steps 
+#Fix legend
+
+```
+
+
+
+```{r}
+#MAP 2: SHOW POPULAR END STATIONS ON MAP 
+#Start with Popular Starting Destinations - Frequency of appearances of each end Station Name
+
+by_endstation <- group_by(bike_data, end.station.name)
+frequency_end <- summarise(by_endstation, count = n())
+
+#Create a dataframe with just end station names and the locations of each
+end_locations <- select(bike_data, end.station.name, end.station.latitude, end.station.longitude)
+
+end_locations_unique <- distinct(end_locations, end.station.name, end.station.latitude, end.station.longitude)
+
+
+#Merge the 2 data frames we've just created in order to have a full picture of how frequent each start station is used and where it is locatd on the map. 
+
+
+
+#Merge the 2 data frames for use in mapping
+end_station <- merge(frequency_end, end_locations_unique, by="end.station.name")
+
+
+
+
+
+#END_STATION contains the count of how many times people ended at each station. 
+```
+
+```{r}
+#Map Part for Map 2
+
+dev.off() #Sometimes graphics display is glitchy
+#Inserts searched map of New York City into variable mapny
+mapny_end <- get_map(location = "Empire State Building", zoom = 12, color = "bw")
+#Displays map
+ggmap(mapny_end)
+points_end <- ggmap(mapny_end) + geom_point(data = end_station, aes(x=end_station$end.station.longitude, y=end_station$end.station.latitude, color ="red", alpha = 1, size = end_station$count)) + labs(title = "Popular Ending Stations", x = "Longitude", y = "Latitude")
+
+
+
+points_end
+
+
+```
+
+SONIA
+```{r Identify patterns}
+
+bike_data$bikeidfactor<-as.factor(bikedata$bikeid) 
+#getting levels for unique bike IDs
+nlevels(bike_data$bikeidfactor)
+ #total number of unique bikes
+uniquebikeduration<-tapply(bike_data$tripduration/60,bike_data$bikeidfactor,sum) 
+#getting sums of trip durations by bike ID (in minutes?)
+plot(uniquebikeduration)
+boxplot(uniquebikeduration)
+#finding outliers of total trip duration
+freq_table<-table(bike_data$bikeidfactor) 
+#getting table listing frequency of use by unique bike ID
+hist(freq_table,main="Number of Rides per Bike")
+#Creating histogram from frequency table
+barplot(freq_table)
+#all bike IDs with rides over 300 have ID #s > 21500. Bikes with higher ID numbers generally require more maintenance. Might make sense if there’s a systematic way of giving ID #s
+highusage_table<-(freq_table[freq_table>400])
+length(highusage_table)
+#102 bikes have a usage above 400 rides/month. We may be able to drill down into these IDs to find common themes that predict usage?
+highusage_frame<-data.frame(highusage_table)
+```
+
+
+
+

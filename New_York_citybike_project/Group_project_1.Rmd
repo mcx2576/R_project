@@ -1,0 +1,59 @@
+---
+title: "Group project 1"
+author: "Group 8"
+date: "October 8, 2016"
+output: html_document
+---
+
+
+
+```{r Identify patterns}
+#Which stations see the most asymmetric traffic (more arrivals than departures and vice versa)? Does this change with time of day and day of the week?#
+bike_data<-read.csv("201508-citibike-tripdata.csv", header = T, sep = ",");
+x<-table(bike_data$start.station.name); y<-table(bike_data$end.station.name);station<-merge(x,y,by.x="Var1",by.y = "Var1", all.y = TRUE);station$asy <-as.numeric(station$Freq.x)-as.numeric(station$Freq.y);with(station,Var1[which.max(asy)]);with(station,Var1[which.min(asy)]);
+startHours <- format(as.POSIXct(strptime(bike_data$starttime,"%m/%d/%Y %H:%M:%S",tz="")) ,format = "%H");
+bike_data$startHours <- startHours
+startDate <- format(as.POSIXct(strptime(bike_data$starttime,"%m/%d/%Y %H:%M:%S",tz="")) ,format = "%m/%d/%Y");
+bike_data$startDate<-startDate
+endHours <- format(as.POSIXct(strptime(bike_data$stoptime,"%m/%d/%Y %H:%M:%S",tz="")) ,format = "%H");
+bike_data$endHours <- endHours;
+endDate <- format(as.POSIXct(strptime(bike_data$stoptime,"%m/%d/%Y %H:%M:%S",tz="")) ,format = "%m/%d/%Y");
+bike_data$endDate <- endDate;
+bike_data$startimezone[bike_data$startHours<08]<-"early morning";
+bike_data$startimezone[bike_data$startHours>=08&bike_data$startHours<12]<-"day time";
+bike_data$startimezone[bike_data$startHours>=12&bike_data$startHours<16]<-"afternoon";
+bike_data$startimezone[bike_data$startHours>=16&bike_data$startHours<20]<-"evening";
+bike_data$startimezone[bike_data$startHours>=20&bike_data$startHours<24]<-"midnight";
+
+bike_data$endtimezone[bike_data$endHours<08]<-"early morning";
+bike_data$endtimezone[bike_data$endHours>=08&bike_data$endHours<12]<-"day time";
+bike_data$endtimezone[bike_data$endHours>=12&bike_data$endHours<16]<-"afternoon";
+bike_data$endtimezone[bike_data$endHours>=16&bike_data$endHours<20]<-"evening";
+bike_data$endtimezone[bike_data$endHours>=20&bike_data$endHours<24]<-"midnight";
+
+sttz<-as.data.frame.matrix(table(bike_data$start.station.name,bike_data$startimezone))
+ettz<-as.data.frame.matrix(table(bike_data$end.station.name,bike_data$endtimezone));
+bike_data$startday[bike_data$startDate=="08/01/2015"]<-"Saturday";bike_data$startday[bike_data$startDate=="08/08/2015"]<-"Saturday";bike_data$startday[bike_data$startDate=="08/15/2015"]<-"Saturday";bike_data$startday[bike_data$startDate=="08/22/2015"]<-"Saturday";bike_data$startday[bike_data$startDate=="08/29/2015"]<-"Saturday";
+bike_data$endday[bike_data$endDate=="08/01/2015"]<-"Saturday";bike_data$endday[bike_data$endDate=="08/08/2015"]<-"Saturday";bike_data$endday[bike_data$endDate=="08/15/2015"]<-"Saturday";bike_data$endday[bike_data$endDate=="08/22/2015"]<-"Saturday";bike_data$endday[bike_data$endDate=="08/29/2015"]<-"Saturday";
+bike_data$startday[bike_data$startDate=="08/02/2015"]<-"Sunday";bike_data$startday[bike_data$startDate=="08/09/2015"]<-"Sunday";bike_data$startday[bike_data$startDate=="08/16/2015"]<-"Sunday";bike_data$startday[bike_data$startDate=="08/23/2015"]<-"Sunday";bike_data$startday[bike_data$startDate=="08/30/2015"]<-"Sunday";
+bike_data$endday[bike_data$endDate=="08/02/2015"]<-"Sunday";bike_data$endday[bike_data$endDate=="08/09/2015"]<-"Sunday";bike_data$endday[bike_data$endDate=="08/16/2015"]<-"Sunday";bike_data$endday[bike_data$endDate=="08/23/2015"]<-"Sunday";bike_data$endday[bike_data$endDate=="08/30/2015"]<-"Sunday";
+bike_data$startday[bike_data$startDate=="08/03/2015"]<-"Monday";bike_data$startday[bike_data$startDate=="08/10/2015"]<-"Monday";bike_data$startday[bike_data$startDate=="08/17/2015"]<-"Monday";bike_data$startday[bike_data$startDate=="08/24/2015"]<-"Monday";bike_data$startday[bike_data$startDate=="08/31/2015"]<-"Monday";
+ bike_data$endday[bike_data$endDate=="08/03/2015"]<-"Monday";bike_data$endday[bike_data$endDate=="08/10/2015"]<-"Monday";bike_data$endday[bike_data$endDate=="08/17/2015"]<-"Monday";bike_data$endday[bike_data$endDate=="08/24/2015"]<-"Monday";bike_data$endday[bike_data$endDate=="08/31/2015"]<-"Monday";
+bike_data$startday[bike_data$startDate=="08/04/2015"]<-"Tuesday";bike_data$startday[bike_data$startDate=="08/11/2015"]<-"Tuesday";bike_data$startday[bike_data$startDate=="08/18/2015"]<-"Tuesday";bike_data$startday[bike_data$startDate=="08/25/2015"]<-"Tuesday";
+bike_data$endday[bike_data$endDate=="08/04/2015"]<-"Tuesday";bike_data$endday[bike_data$endDate=="08/11/2015"]<-"Tuesday";bike_data$endday[bike_data$endDate=="08/18/2015"]<-"Tuesday";bike_data$endday[bike_data$endDate=="08/25/2015"]<-"Tuesday";
+bike_data$startday[bike_data$startDate=="08/05/2015"]<-"Wednesday";bike_data$startday[bike_data$startDate=="08/12/2015"]<-"Wednesday";bike_data$startday[bike_data$startDate=="08/19/2015"]<-"Wednesday";bike_data$startday[bike_data$startDate=="08/26/2015"]<-"Wednesday";
+bike_data$endday[bike_data$endDate=="08/05/2015"]<-"Wednesday";bike_data$endday[bike_data$endDate=="08/12/2015"]<-"Wednesday";bike_data$endday[bike_data$endDate=="08/19/2015"]<-"Wednesday";bike_data$endday[bike_data$endDate=="08/26/2015"]<-"Wednesday";
+bike_data$startday[bike_data$startDate=="08/06/2015"]<-"Thursday";bike_data$startday[bike_data$startDate=="08/13/2015"]<-"Thursday";bike_data$startday[bike_data$startDate=="08/20/2015"]<-"Thursday";bike_data$startday[bike_data$startDate=="08/27/2015"]<-"Thursday";
+bike_data$endday[bike_data$endDate=="08/06/2015"]<-"Thursday";bike_data$endday[bike_data$endDate=="08/13/2015"]<-"Thursday";bike_data$endday[bike_data$endDate=="08/20/2015"]<-"Thursday";bike_data$endday[bike_data$endDate=="08/27/2015"]<-"Thursday";
+bike_data$startday[bike_data$startDate=="08/07/2015"]<-"Friday";bike_data$startday[bike_data$startDate=="08/14/2015"]<-"Friday";bike_data$startday[bike_data$startDate=="08/21/2015"]<-"Friday";bike_data$startday[bike_data$startDate=="08/28/2015"]<-"Friday";
+bike_data$endday[bike_data$endDate=="08/07/2015"]<-"Friday";bike_data$endday[bike_data$endDate=="08/14/2015"]<-"Friday";bike_data$endday[bike_data$endDate=="08/21/2015"]<-"Friday";bike_data$endday[bike_data$endDate=="08/28/2015"]<-"Friday";
+stbd<-as.data.frame.matrix(table(bike_data$start.station.name,bike_data$startday));
+edbd<-as.data.frame.matrix(table(bike_data$end.station.name,bike_data$endday));
+asy_timezones<-merge.data.frame(sttz,ettz,by.x = 0,by.y = 0, all.y = TRUE);asy_timezones$asy_a<-as.numeric(asy_timezones$afternoon.x)-as.numeric(asy_timezones$afternoon.y);with(asy_timezones,Row.names[which.max(asy_a)]);with(asy_timezones,Row.names[which.min(asy_a)]);asy_timezones$asy_em<-as.numeric(asy_timezones$`early morning.x`)-as.numeric(asy_timezones$`early morning.y`);with(asy_timezones,Row.names[which.max(asy_em)]);with(asy_timezones,Row.names[which.min(asy_em)]);asy_timezones$asy_e<-as.numeric(asy_timezones$evening.x)-as.numeric(asy_timezones$evening.y);with(asy_timezones,Row.names[which.max(asy_e)]);with(asy_timezones,Row.names[which.min(asy_e)]);asy_timezones$asy_m<-as.numeric(asy_timezones$midnight.x)-as.numeric(asy_timezones$midnight.y);with(asy_timezones,Row.names[which.max(asy_m)]);with(asy_timezones,Row.names[which.min(asy_m)]);
+asy_timezones$asy_d<-as.numeric(asy_timezones$)-as.numeric(asy_timezones$midnight.y);with(asy_timezones,Row.names[which.max(asy_m)]);with(asy_timezones,Row.names[which.min(asy_m)])
+asy_days<-merge.data.frame(stbd,edbd,by.x = 0,by.y = 0, all.y = TRUE);
+asy_days$asy_Sa<-as.numeric(asy_days$Saturday.x)-as.numeric(asy_days$Saturday.y);with(asy_days,Row.names[which.max(asy_Sa)]);with(asy_days,Row.names[which.min(asy_Sa)]);asy_days$asy_F<-as.numeric(asy_days$Friday.x)-as.numeric(asy_days$Friday.y);with(asy_days,Row.names[which.max(asy_F)]);with(asy_days,Row.names[which.min(asy_F)]);asy_days$asy_Su<-as.numeric(asy_days$Sunday.x)-as.numeric(asy_days$Sunday.y);with(asy_days,Row.names[which.max(asy_Su)]);with(asy_days,Row.names[which.min(asy_Su)]);asy_days$asy_M<-as.numeric(asy_days$Monday.x)-as.numeric(asy_days$Monday.y);with(asy_days,Row.names[which.max(asy_M)]);with(asy_days,Row.names[which.min(asy_M)]);asy_days$asy_Tu<-as.numeric(asy_days$Tuesday.x)-as.numeric(asy_days$Tuesday.y);with(asy_days,Row.names[which.max(asy_Tu)]);with(asy_days,Row.names[which.min(asy_Tu)]);asy_days$asy_W<-as.numeric(asy_days$Wednesday.x)-as.numeric(asy_days$Wednesday.y);with(asy_days,Row.names[which.max(asy_W)]);with(asy_days,Row.names[which.min(asy_W)]);asy_days$asy_Tur<-as.numeric(asy_days$Thursday.x)-as.numeric(asy_days$Thursday.y);with(asy_days,Row.names[which.max(asy_Tur)]);with(asy_days,Row.names[which.min(asy_Tur)]);
+
+
+
+```

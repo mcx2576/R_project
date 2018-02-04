@@ -1,0 +1,111 @@
+---
+title: "Final Project"
+author: "Mara VanSickle"
+date: "December 1, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+datedata <- read.csv("Speed Dating Data.csv")
+summary(datedata)
+
+#Data for match making accuracy:
+#--->(Everything before variable satis_2)
+
+
+#Variables to change to factors:
+field_cd <- as.factor(field_cd)
+race <- as.factor(race)
+gender <- as.factor(gender)
+goal <- as.factor(goal)
+date <- as.factor(date)
+go_out <- as.factor(go_out)
+career_c <- as.factor(career_c)
+length <- as.factor(length)
+numdat_2 <- as.factor(numdat_2)
+date_3 <- as.factor(date_3)
+
+#Variables to change to numbers
+income <- as.numeric(income)
+mn_sat <- as.numeric(mn_sat)
+tuition <- as.numeric(tuition)
+
+#Variables to change NA to zero
+
+
+#Variables to exclude
+
+
+```
+
+
+###Questions to Address
+Main Question
+*Can you predict matches? And which method of doing so is most accurate?
+      - Which variables have?
+
+(Additional Questions)
+* Who shows up to speed dating?
+      - Gender
+      - Age
+      - Race
+      - Income
+      - Hobbies
+      - Field of Study
+      - Zip Code
+      - Undergrad vs. Grad
+      - etc...
+      
+* Surveys
+      - Comparing surveys over time (which variable matter more short vs. long term)
+      - Most and least desirable factors for each gender
+      - Visualize survey answers by different demographics/questions
+
+* Who is most likely to have a match?
+      - What was the result of those individual surveys?
+      - Do people who think more highly of themselves get or give more matches?
+      
+* How do survey results differ from actual decisions (what they say they like vs. what they actually like)
+
+* Success of matches. Who ended up going on more dates vs. didn't? Which characteristics play a role?
+      - Ex = If there is agreement between what you say you like and actually like, do you date more often?
+
+
+##Getting to know our data
+```{r}
+#Barplot for Match vs. No Match
+
+nomatch <- nrow(subset(datedata, datedata$match == 0))
+
+##Count how many matches there are
+match <- length(which(datedata$match == 1))
+match
+
+###Count how many pairs didn't end in match
+nomatch <- length(which(datedata$match == 0))
+nomatch
+
+match.comparison <- c(match, nomatch)
+
+###Let's graphically display the difference between how many matches and no matches of all pairings created.
+barplot(match.comparison, main = "Match vs. No Match", ylab = "Count", col=c("green", "red"))
+
+
+
+
+
+
+
+
+
+
+
+
+```
+
+
+

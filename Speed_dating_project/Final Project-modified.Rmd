@@ -1,0 +1,245 @@
+---
+title: "Final Project"
+author: "Mara VanSickle"
+date: "December 1, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+datedata <- read.csv("Speed Dating Data.csv")
+summary(datedata)
+
+#Data for match making accuracy:
+#--->(Everything before variable satis_2)
+
+
+#Variables to change to factors:
+datedata$field_cd <- as.factor(datedata$field_cd)
+datedata$race <- as.factor(datedata$race)
+datedata$gender <- as.factor(datedata$gender)
+datedata$goal <- as.factor(datedata$goal)
+datedata$date <- as.factor(datedata$date)
+datedata$go_out <- as.factor(datedata$go_out)
+datedata$career_c <- as.factor(datedata$career_c)
+datedata$length <- as.factor(datedata$length)
+datedata$numdat_2 <- as.factor(datedata$numdat_2)
+datedata$date_3 <- as.factor(datedata$date_3)
+
+#Variables to change to numbers
+datedata$income <- as.numeric(datedata$income)
+datedata$mn_sat <- as.numeric(datedata$mn_sat)
+datedata$tuition <- as.numeric(datedata$tuition)
+
+#Variables to change NA to zero
+
+
+#Variables to exclude
+
+
+```
+
+
+###Questions to Address
+Main Question
+*Can you predict matches? And which method of doing so is most accurate?
+      - Which variables have?
+
+(Additional Questions)
+* Who shows up to speed dating?
+      - Gender
+      - Age
+      - Race
+      - Income
+      - Hobbies
+      - Field of Study
+      - Zip Code
+      - Undergrad vs. Grad
+      - etc...
+      
+* Surveys
+      - Comparing surveys over time (which variable matter more short vs. long term)
+      - Most and least desirable factors for each gender
+      - Visualize survey answers by different demographics/questions
+
+* Who is most likely to have a match?
+      - What was the result of those individual surveys?
+      - Do people who think more highly of themselves get or give more matches?
+      
+* How do survey results differ from actual decisions (what they say they like vs. what they actually like)
+
+* Success of matches. Who ended up going on more dates vs. didn't? Which characteristics play a role?
+      - Ex = If there is agreement between what you say you like and actually like, do you date more often?
+
+
+##Getting to know our data
+```{r}
+#Barplot for Match vs. No Match
+
+nomatch <- nrow(subset(datedata, datedata$match == 0))
+
+##Count how many matches there are
+match <- length(which(datedata$match == 1))
+match
+
+###Count how many pairs didn't end in match
+nomatch <- length(which(datedata$match == 0))
+nomatch
+
+match.comparison <- c(match, nomatch)
+
+###Let's graphically display the difference between how many matches and no matches of all pairings created.
+barplot(match.comparison, main = "Match vs. No Match", ylab = "Count", col=c("green", "red"))
+
+#Create a new dataset recording the person's preference and demographical background#
+date1<-datedata[,c(1,3,11:75,82:86,88:98)]
+#Create a new dataset recording the person's partner's demographical background#
+date2<-datedata[,c(1,3,11:12,25:75,82:86,88:98)]
+date3<-merge(date1, date2, by.x=c('iid','pid'), by.y=c('pid','iid'))
+date3<-date3[date3$iid>date3$pid,]
+names(date3)
+usedate<-date3[,c(5:26,28,30:34,37:40,42:83,97:103,106:152)]
+
+usedate$match<-as.factor(usedate$match)
+usedate$career_c.x<-as.factor(usedate$career_c.x)
+usedate$career_C.y<-as.factor(usedate$career_c.y)
+str(usedate)
+names(usedate)
+
+for(i in 1:ncol(usedate[,c(2:22,24:25,27:29,34:73,77:79,85:128)])){
+  usedate[is.na(usedate[,i]), i] <- mean(usedate[,i], na.rm = TRUE)
+}
+names(usedate)
+usedate$match<-as.factor(usedate$match)
+date.expanded<-as.data.frame(model.matrix(~.-1,data=usedate))
+date.expanded<-as.numeric(date.expanded)
+normalize <- function(x) {return ((x - min(x)) / (max(x) - min(x)))}
+date_n <- as.data.frame(lapply(date.expanded[0:1273], normalize))
+#Random Forest to identify key contributers.
+library(randomForest)
+set.seed(300)
+options(na.action='na.pass')
+use_clean<-na.omit(usedate)
+names(usedate)
+```
+
+```{r random forest}
+#Random forest to determine decision
+names(usedate)
+library(caret)
+ctrl <- trainControl(method = "repeatedcv", number = 3, repeats = 3)
+grid_rf <- expand.grid(.mtry = c(3, 9, 18,36))
+usedate$dec.x<-as.factor(usedate$dec.x)
+set.seed(300)
+m_rf_d <- train(dec.x~int_corr + samerace + age_o + race_o + pf_o_att + pf_o_sin + pf_o_int + pf_o_fun + pf_o_amb + pf_o_sha +  age.x + field_cd.x + mn_sat.x + tuition.x + race.x + imprace.x + imprelig.x + income.x + goal.x + date.x + career_c.x + sports.x + tvsports.x + exercise.x + dining.x + museums.x + art.x + hiking.x + gaming.x + clubbing.x +reading.x + tv.x + theater.x + movies.x + concerts.x + music.x + shopping.x + yoga.x + exphappy.x + expnum.x + + attr1_1.x + 
+    sinc1_1.x + intel1_1.x + fun1_1.x + amb1_1.x + shar1_1.x + 
+    attr2_1.x + sinc2_1.x + intel2_1.x + fun2_1.x + amb2_1.x + 
+    attr3_1.x + sinc3_1.x + fun3_1.x + intel3_1.x + amb3_1.x + 
+    attr5_1.x + sinc5_1.x + intel5_1.x + fun5_1.x + amb5_1.x + field_cd.y + mn_sat.y + tuition.y + imprace.y + imprelig.y + income.y + goal.y + date.y + go_out.y + career_c.y + sports.y + tvsports.y + exercise.y + dining.y + museums.y + art.y + hiking.y + gaming.y + clubbing.y + reading.y + tv.y + theater.y + movies.y + concerts.y + music.y + shopping.y + yoga.y + exphappy.y + expnum.y + 
+    attr2_1.y + sinc2_1.y + intel2_1.y + fun2_1.y + amb2_1.y + 
+    attr3_1.y + sinc3_1.y + fun3_1.y + intel3_1.y + amb3_1.y + 
+    attr5_1.y + sinc5_1.y + intel5_1.y + fun5_1.y + amb5_1.y, data = usedate, na.action = 'na.exclude', method = "rf", metric = "Kappa", trControl = ctrl, tuneGrid = grid_rf)
+#The final value used for the model was mtry = 3. The Accuracy is 0.719, Kappa statistic is 0.419, which is pretty good for the a rf model#
+m_rf_d
+
+#Showing the importance of each variables#
+contribution_rf_d<-as.data.frame(importance(m_rf_d$finalModel))
+library(data.table)
+setDT(contribution_rf_d, keep.rownames = TRUE)[]
+contribution_rf_high_d<-contribution_rf[contribution_rf_d$MeanDecreaseGini>10.1,]
+
+#Present the importance of vairable in bar chart#
+
+ggplot(contribution_rf_high_d, aes(x=rn,y=MeanDecreaseGini))+geom_bar(stat="identity")+
+     geom_bar(data=subset(contribution_rf_high_d, MeanDecreaseGini==max(MeanDecreaseGini)), aes(rn, MeanDecreaseGini),
+              fill="green", stat="identity")
+
+
+```
+
+```{r random forest}
+#Random forest to determine decision of the partner
+names(usedate)
+library(caret)
+ctrl <- trainControl(method = "repeatedcv", number = 3, repeats = 3)
+grid_rf <- expand.grid(.mtry = c(3, 9, 18,36))
+usedate$dec.y<-as.factor(usedate$dec.y)
+set.seed(300)
+m_rf_d0 <- train(dec.y~int_corr + samerace + age_o + race_o + pf_o_att + pf_o_sin + pf_o_int + pf_o_fun + pf_o_amb + pf_o_sha +  age.x + field_cd.x + mn_sat.x + tuition.x + race.x + imprace.x + imprelig.x + income.x + goal.x + date.x + career_c.x + sports.x + tvsports.x + exercise.x + dining.x + museums.x + art.x + hiking.x + gaming.x + clubbing.x +reading.x + tv.x + theater.x + movies.x + concerts.x + music.x + shopping.x + yoga.x + exphappy.x + expnum.x + + attr1_1.x + 
+    sinc1_1.x + intel1_1.x + fun1_1.x + amb1_1.x + shar1_1.x + 
+    attr2_1.x + sinc2_1.x + intel2_1.x + fun2_1.x + amb2_1.x + 
+    attr3_1.x + sinc3_1.x + fun3_1.x + intel3_1.x + amb3_1.x + 
+    attr5_1.x + sinc5_1.x + intel5_1.x + fun5_1.x + amb5_1.x + field_cd.y + mn_sat.y + tuition.y + imprace.y + imprelig.y + income.y + goal.y + date.y + go_out.y + career_c.y + sports.y + tvsports.y + exercise.y + dining.y + museums.y + art.y + hiking.y + gaming.y + clubbing.y + reading.y + tv.y + theater.y + movies.y + concerts.y + music.y + shopping.y + yoga.y + exphappy.y + expnum.y + 
+    attr2_1.y + sinc2_1.y + intel2_1.y + fun2_1.y + amb2_1.y + 
+    attr3_1.y + sinc3_1.y + fun3_1.y + intel3_1.y + amb3_1.y + 
+    attr5_1.y + sinc5_1.y + intel5_1.y + fun5_1.y + amb5_1.y, data = usedate, na.action = 'na.exclude', method = "rf", metric = "Kappa", trControl = ctrl, tuneGrid = grid_rf)
+#The final value used for the model was mtry = 36. The Accuracy is 0.719, Kappa statistic is 0.371, which is pretty good for the a rf model#
+m_rf_d0
+
+#Showing the importance of each variables#
+contribution_rf_d0<-as.data.frame(importance(m_rf_d0$finalModel))
+library(data.table)
+setDT(contribution_rf_d0, keep.rownames = TRUE)[]
+contribution_rf_high_d0<-contribution_rf_d0[contribution_rf_d0$MeanDecreaseGini>14,]
+
+#Present the importance of vairable in bar chart#
+
+ggplot(contribution_rf_high_d0, aes(x=rn,y=MeanDecreaseGini))+geom_bar(stat="identity")+
+     geom_bar(data=subset(contribution_rf_high_d0, MeanDecreaseGini==max(MeanDecreaseGini)), aes(rn, MeanDecreaseGini),
+              fill="green", stat="identity")
+
+
+```
+
+
+```{r random forest to predict match}
+
+library(caret)
+f<-as.formula(paste("match~",paste(names(usedate),collapse = "+")))
+f
+ctrl <- trainControl(method = "repeatedcv", number = 3, repeats = 3)
+usedate$match<-as.factor(usedate$match)
+grid_rf <- expand.grid(.mtry = c(3, 9, 18, 36))
+set.seed(300)
+m_rf <- train(match~int_corr + samerace + age_o + race_o + pf_o_att + pf_o_sin + pf_o_int + pf_o_fun + pf_o_amb + pf_o_sha + age.x + field_cd.x + mn_sat.x + tuition.x + race.x + imprace.x + imprelig.x + income.x + goal.x + date.x + career_c.x + sports.x + tvsports.x + exercise.x + dining.x + museums.x + art.x + hiking.x + gaming.x + clubbing.x +reading.x + tv.x + theater.x + movies.x + concerts.x + music.x + shopping.x + yoga.x + exphappy.x + expnum.x + + attr1_1.x + 
+    sinc1_1.x + intel1_1.x + fun1_1.x + amb1_1.x + shar1_1.x + 
+    attr2_1.x + sinc2_1.x + intel2_1.x + fun2_1.x + amb2_1.x + 
+    attr3_1.x + sinc3_1.x + fun3_1.x + intel3_1.x + amb3_1.x + 
+    attr5_1.x + sinc5_1.x + intel5_1.x + fun5_1.x + amb5_1.x + + field_cd.y + mn_sat.y + tuition.y + imprace.y + imprelig.y + income.y + goal.y + date.y + go_out.y + career_c.y + sports.y + tvsports.y + exercise.y + dining.y + museums.y + art.y + hiking.y + gaming.y + clubbing.y + reading.y + tv.y + theater.y + movies.y + concerts.y + music.y + shopping.y + yoga.y + exphappy.y + expnum.y + 
+    attr2_1.y + sinc2_1.y + intel2_1.y + fun2_1.y + amb2_1.y + 
+    attr3_1.y + sinc3_1.y + fun3_1.y + intel3_1.y + amb3_1.y + 
+    attr5_1.y + sinc5_1.y + intel5_1.y + fun5_1.y + amb5_1.y , data = usedate, na.action = 'na.exclude', method = "rf", metric = "Kappa", trControl = ctrl, tuneGrid = grid_rf)
+
+#The final value used for the model was mtry = 36. The accuracy is 0.843,which is relatively high#
+m_rf_d0$finalModel
+#Showing the importance of each variables#
+contribution_rf_d0<-as.data.frame(importance(m_rf_d0$finalModel))
+library(data.table)
+setDT(contribution_rf_d0, keep.rownames = TRUE)[]
+contribution_rf_high_d0<-contribution_rf_d0[contribution_rf_d0$MeanDecreaseGini>7.5,]
+
+#Present the importance of vairable in bar chart#
+
+ggplot(contribution_rf_high, aes(x=rn,y=MeanDecreaseGini))+geom_bar(stat="identity")+
+     geom_bar(data=subset(contribution_rf_high_d0, MeanDecreaseGini==max(MeanDecreaseGini)), aes(rn, MeanDecreaseGini),
+              fill="green", stat="identity")
+
+
+```
+
+```{r logit models}
+#Logit models to identify key drivers for match options
+library(gmodels)
+logit.model1 <- glm(match ~ int_corr + samerace + age_o + pf_o_att +
++ pf_o_sin + pf_o_int + pf_o_fun + pf_o_amb + pf_o_sha + attr_o.x + sinc_o.x + intel_o.x + fun_o.x + amb_o.x + shar_o.x , data = usedate, family = "binomial",na.action = 'na.exclude')
+
+summary(logit.model1)
+names(usedate)
+useinterest<-usedate
+```
+
+
+

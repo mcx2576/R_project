@@ -1,0 +1,11 @@
+Two R projects are included in this folder:
+1. New York city bike
+-The original dataset are datapoints recoding each bike's traveling information, such start station, end station, departure time and arrived time. In addition, some users' personal information such as birth year and gender are included as well.
+-We are requred to implement data mining techiniques to aquire much information from this file.
+-We also need to utlize informative graphs to enclose valuable information from the dataset.
+-The file ouput is displayed in the html file.
+2. Speed dating project
+-The original datasets records the dating information of six speed dating activities.
+-Each datapoint dipicts two participants' interets, education background, annual income as well as desired personal traits before the meeting. The final outcome of matching or not matching are also included.
+-We are required to implement simple satistical analysis as well as advanced machine learning tecniques such as knn ,neural network, random forest and other ensembled algorithms to predict the matching probability of two participants.
+-Advanced training methods such as corss-validation are also encouraged. 
